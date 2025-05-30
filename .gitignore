@@ -7,6 +7,7 @@
 .env.local
 .env.production
 .env.test
+.env.backup
 *.env
 
 # Node.js Dependencies
@@ -108,3 +109,30 @@ config/development.js
 *.tar.gz
 .nyc_output
 
+# GitHub Credentials & Authentication
+.git-credentials
+*.token
+github-token.txt
+
+# Setup Scripts với credentials
+setup-private-repo.sh.backup
+*credentials*
+
+# ==============================================
+# ⚠️ LƯU Ý QUAN TRỌNG:
+# ==============================================
+# 
+# 1. File .env chứa Discord Token và MongoDB URI
+#    -> KHÔNG BAO GIỜ commit file này!
+# 
+# 2. Backup folder có thể chứa .env backup
+#    -> Cũng không được commit!
+# 
+# 3. Nếu bạn vô tình commit .env:
+#    - Xóa khỏi Git: git rm --cached .env
+#    - Regenerate Discord Token ngay lập tức
+#    - Đổi MongoDB password
+# 
+# 4. Chỉ commit file env.example (không có thông tin thật)
+# 
+# ============================================== 

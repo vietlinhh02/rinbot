@@ -70,23 +70,52 @@ class ReminderScheduler {
                 return;
             }
 
-            // Tạo embed nhắc nhở
+            // Tạo embed nhắc nhở đẹp
             const embed = new EmbedBuilder()
-                .setTitle('⏰ NHẮC NHỞ!')
-                .setDescription(`**📝 Nội dung:** ${reminder.message}\n\n` +
-                    `**⏰ Thời gian đặt:** ${reminder.reminderTime.toLocaleString('vi-VN', { 
-                        timeZone: 'Asia/Ho_Chi_Minh',
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    })}\n\n` +
-                    `**🎯 Đây là lời nhắc bạn đã đặt!**\n\n` +
-                    `*Tin nhắn tự động từ bot* 🤖`)
-                .setColor('#FF6600')
-                .setFooter({ text: `ID: ${reminder._id} | Từ server: ${reminder.guildId}` })
+                .setTitle('🔔 NHẮC NHỞ!')
+                .setDescription(`### 📋 ${reminder.message}`)
+                .addFields(
+                    {
+                        name: '⏰ Thời gian đặt nhắc',
+                        value: `${reminder.reminderTime.toLocaleString('vi-VN', { 
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}`,
+                        inline: false
+                    },
+                    {
+                        name: '📅 Được tạo lúc',
+                        value: `${reminder.createdAt.toLocaleString('vi-VN', { 
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}`,
+                        inline: true
+                    },
+                    {
+                        name: '⚡ Gửi lúc',
+                        value: `${new Date().toLocaleString('vi-VN', { 
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        })}`,
+                        inline: true
+                    }
+                )
+                .setColor('#FFD700')
+                .setThumbnail('https://cdn-icons-png.flaticon.com/512/1827/1827422.png')
+                .setFooter({ 
+                    text: `🤖 RinBot Reminder • ID: ${reminder._id.toString().slice(-8)}`,
+                    iconURL: this.client.user.displayAvatarURL() 
+                })
                 .setTimestamp();
 
             // Gửi DM
@@ -143,18 +172,33 @@ class ReminderScheduler {
             const user = await this.client.users.fetch(reminder.userId);
             
             const embed = new EmbedBuilder()
-                .setTitle('⏰ NHẮC NHỞ!')
-                .setDescription(`${user} **📝 Nội dung:** ${reminder.message}\n\n` +
-                    `**⏰ Thời gian đặt:** ${reminder.reminderTime.toLocaleString('vi-VN', { 
-                        timeZone: 'Asia/Ho_Chi_Minh',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        day: 'numeric',
-                        month: 'short'
-                    })}\n\n` +
-                    `*Gửi tại đây vì không thể DM được* 💬`)
+                .setTitle('🔔 NHẮC NHỞ!')
+                .setDescription(`### 📋 ${reminder.message}\n\n${user} **đây là lời nhắc của bạn!**`)
+                .addFields(
+                    {
+                        name: '⏰ Thời gian nhắc',
+                        value: `${reminder.reminderTime.toLocaleString('vi-VN', { 
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}`,
+                        inline: true
+                    },
+                    {
+                        name: '📍 Lý do gửi tại đây',
+                        value: 'Không thể gửi tin nhắn riêng\n*(DM bị tắt)*',
+                        inline: true
+                    }
+                )
                 .setColor('#FFA500')
-                .setFooter({ text: 'Để nhận DM, hãy bật "Allow direct messages from server members"' })
+                .setThumbnail('https://cdn-icons-png.flaticon.com/512/1827/1827422.png')
+                .setFooter({ 
+                    text: '💡 Để nhận DM, hãy bật "Allow direct messages from server members"',
+                    iconURL: this.client.user.displayAvatarURL()
+                })
                 .setTimestamp();
 
             await channel.send({ embeds: [embed] });

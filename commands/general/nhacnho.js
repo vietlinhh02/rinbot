@@ -62,21 +62,48 @@ module.exports = {
             // Hiển thị xác nhận
             const embed = new EmbedBuilder()
                 .setTitle('⏰ ĐẶT NHẮC NHỞ THÀNH CÔNG!')
-                .setDescription(`**📝 Nội dung:** ${reminderText}\n\n` +
-                    `**⏰ Thời gian:** ${reminderTime.toLocaleString('vi-VN', { 
-                        timeZone: 'Asia/Ho_Chi_Minh',
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long', 
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    })}\n\n` +
-                    `**👤 Người nhận:** ${message.author.displayName}\n` +
-                    `**📧 Gửi qua:** Tin nhắn riêng (DM)\n\n` +
-                    `**💡 Lưu ý:** Bot sẽ gửi tin nhắn riêng cho bạn khi tới giờ!`)
-                .setColor('#00FF00')
-                .setFooter({ text: `ID: ${reminder._id}` })
+                .setDescription(`### ✅ Nhắc nhở đã được thiết lập!`)
+                .addFields(
+                    {
+                        name: '📝 Nội dung nhắc nhở',
+                        value: `**"${reminderText}"**`,
+                        inline: false
+                    },
+                    {
+                        name: '⏰ Thời gian nhắc',
+                        value: `${reminderTime.toLocaleString('vi-VN', { 
+                            timeZone: 'Asia/Ho_Chi_Minh',
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}`,
+                        inline: false
+                    },
+                    {
+                        name: '👤 Người nhận',
+                        value: `${message.author.displayName}`,
+                        inline: true
+                    },
+                    {
+                        name: '📱 Phương thức gửi',
+                        value: `💌 Tin nhắn riêng (DM)`,
+                        inline: true
+                    },
+                    {
+                        name: '🆔 Mã nhắc nhở',
+                        value: `\`${reminder._id.toString().slice(-8)}\``,
+                        inline: true
+                    }
+                )
+                .setColor('#00FF7F')
+                .setThumbnail('https://cdn-icons-png.flaticon.com/512/1827/1827422.png')
+                .setFooter({ 
+                    text: `🔔 Bot sẽ gửi tin nhắn riêng cho bạn khi tới giờ!`,
+                    iconURL: message.client.user.displayAvatarURL()
+                })
                 .setTimestamp();
 
             await message.reply({ embeds: [embed] });

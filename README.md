@@ -79,6 +79,41 @@ nano .env  # hoặc notepad .env trên Windows
 DISCORD_TOKEN=your_discord_bot_token_here
 MONGO_URI=mongodb://localhost:27017/rinbot
 BOT_PREFIX=,
+
+# BẮT BUỘC: Owner ID để sử dụng lệnh update
+DISCORD_OWNER_ID=your_discord_user_id
+
+# BẮT BUỘC: GitHub Token cho Private Repository
+GITHUB_TOKEN=your_github_personal_access_token
+GITHUB_USERNAME=your_github_username
+```
+
+### **📦 Setup Private Repository** 
+
+**1. Tạo GitHub Personal Access Token:**
+- 🌐 Vào: https://github.com/settings/tokens
+- ➕ **Generate new token (classic)**
+- ✅ Chọn quyền **`repo`** (Full control of private repositories)
+- 📝 Copy token và paste vào `GITHUB_TOKEN` trong `.env`
+
+**2. Cấu hình Repository:**
+```bash
+# Đảm bảo remote URL đúng format
+git remote -v
+
+# Nếu dùng HTTPS (khuyến nghị cho private repo)
+git remote set-url origin https://github.com/username/repo-name.git
+
+# Nếu dùng SSH (cần setup SSH key trước)
+git remote set-url origin git@github.com:username/repo-name.git
+```
+
+**3. Test Authentication:**
+```bash
+# Test pull thủ công trước
+git pull origin main
+
+# Nếu thành công, lệnh ,update sẽ hoạt động
 ```
 
 ### **Bước 4: Tạo Discord Bot**

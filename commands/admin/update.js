@@ -156,44 +156,45 @@ module.exports = {
     async executeUpdate(message) {
         const progressEmbed = new EmbedBuilder()
             .setTitle('🔄 ĐANG CẬP NHẬT BOT...')
-            .setDescription('**Bước 1/5:** Đang backup dữ liệu...')
+            .setDescription('**Bước 1/5:** Đang backup dữ liệu và chuẩn bị...')
             .setColor('#FFA500')
             .setTimestamp();
 
         const progressMsg = await message.reply({ embeds: [progressEmbed] });
 
         try {
-            // Bước 1: Backup
-            await this.updateProgress(progressMsg, 1, 'Backup dữ liệu', '#FFA500');
+            // Bước 1: Backup và setup
+            await this.updateProgress(progressMsg, 1, 'Backup dữ liệu và setup Git authentication', '#FFA500');
             await this.performBackup();
+            await this.setupGitAuth();
 
             // Bước 2: Git pull
-            await this.updateProgress(progressMsg, 2, 'Đang pull code từ GitHub', '#FFA500');
-            await this.executeCommand('git pull origin main');
+            await this.updateProgress(progressMsg, 2, 'Đang pull code từ private repository', '#FFA500');
+            await this.executeGitPull();
 
             // Bước 3: Cài dependencies
-            await this.updateProgress(progressMsg, 3, 'Đang cài đặt dependencies', '#FFA500');
+            await this.updateProgress(progressMsg, 3, 'Đang cài đặt dependencies mới', '#FFA500');
             await this.executeCommand('npm install --production');
 
             // Bước 4: Kiểm tra integrity
-            await this.updateProgress(progressMsg, 4, 'Kiểm tra tính toàn vẹn', '#FFA500');
+            await this.updateProgress(progressMsg, 4, 'Kiểm tra tính toàn vẹn và cấu hình', '#FFA500');
             await this.checkIntegrity();
 
             // Bước 5: Restart
-            await this.updateProgress(progressMsg, 5, 'Restart bot', '#00FF00');
+            await this.updateProgress(progressMsg, 5, 'Hoàn thành và restart bot', '#00FF00');
             
             const successEmbed = new EmbedBuilder()
                 .setTitle('✅ CẬP NHẬT THÀNH CÔNG!')
-                .setDescription('**🎉 Bot đã được cập nhật thành công!**\n\n' +
-                    '✅ Backup: Hoàn thành\n' +
-                    '✅ Pull code: Hoàn thành\n' +
-                    '✅ Dependencies: Hoàn thành\n' +
-                    '✅ Integrity check: OK\n' +
-                    '✅ Restart: Hoàn thành\n\n' +
+                .setDescription('**🎉 Bot đã được cập nhật từ private repository!**\n\n' +
+                    '✅ **Backup & Setup:** Hoàn thành\n' +
+                    '✅ **Pull Code:** Hoàn thành\n' +
+                    '✅ **Dependencies:** Hoàn thành\n' +
+                    '✅ **Integrity Check:** OK\n' +
+                    '✅ **Restart:** Hoàn thành\n\n' +
                     '**🤖 Bot đang khởi động lại...**\n' +
-                    'Bot sẽ online trở lại trong vài giây!')
+                    '🔄 Bot sẽ online trở lại trong vài giây!')
                 .setColor('#00FF00')
-                .setFooter({ text: 'Update completed at' })
+                .setFooter({ text: 'Private repo update completed at' })
                 .setTimestamp();
 
             await progressMsg.edit({ embeds: [successEmbed] });
@@ -204,21 +205,87 @@ module.exports = {
             }, 3000);
 
         } catch (error) {
-            console.error('Lỗi update:', error);
+            console.error('Lỗi update private repo:', error);
             
             const errorEmbed = new EmbedBuilder()
-                .setTitle('❌ CẬP NHẬT THẤT BẠI!')
+                .setTitle('❌ CẬP NHẬT PRIVATE REPO THẤT BẠI!')
                 .setDescription(`**💥 Có lỗi xảy ra trong quá trình cập nhật:**\n\n` +
                     `\`\`\`${error.message}\`\`\`\n\n` +
-                    '**🔧 Giải pháp:**\n' +
-                    '• Kiểm tra kết nối internet\n' +
-                    '• Kiểm tra quyền ghi file\n' +
-                    '• Thử `,update force` để cập nhật bắt buộc\n' +
-                    '• Liên hệ admin nếu vẫn lỗi')
+                    '**🔧 Giải pháp cho Private Repository:**\n' +
+                    '• Kiểm tra `GITHUB_TOKEN` trong .env\n' +
+                    '• Đảm bảo token có quyền truy cập repo\n' +
+                    '• Thử `,update force` để reset và pull lại\n' +
+                    '• Kiểm tra SSH key nếu dùng SSH\n' +
+                    '• Liên hệ dev nếu vẫn lỗi')
                 .setColor('#FF0000')
                 .setTimestamp();
 
             await progressMsg.edit({ embeds: [errorEmbed] });
+        }
+    },
+
+    // Setup Git authentication cho private repository
+    async setupGitAuth() {
+        try {
+            // Kiểm tra xem có GitHub token không
+            const githubToken = process.env.GITHUB_TOKEN;
+            const githubUser = process.env.GITHUB_USERNAME || 'github-user';
+            
+            if (githubToken) {
+                // Sử dụng Personal Access Token
+                console.log('🔑 Đang setup GitHub authentication với PAT...');
+                
+                // Set up git credential helper để sử dụng token
+                await this.executeCommand(`git config credential.helper store`);
+                
+                // Get current remote URL
+                const remoteUrl = await this.executeCommand('git config --get remote.origin.url');
+                const cleanUrl = remoteUrl.trim();
+                
+                // Nếu URL hiện tại là HTTPS, thêm token
+                if (cleanUrl.includes('https://github.com/')) {
+                    const repoPath = cleanUrl.replace('https://github.com/', '');
+                    const newUrl = `https://${githubUser}:${githubToken}@github.com/${repoPath}`;
+                    await this.executeCommand(`git remote set-url origin "${newUrl}"`);
+                    console.log('✅ Đã cấu hình GitHub PAT authentication');
+                } else if (cleanUrl.includes('git@github.com:')) {
+                    console.log('🔑 Đang sử dụng SSH authentication');
+                    // SSH key should be already configured
+                } else {
+                    console.log('⚠️ Unknown git remote format:', cleanUrl);
+                }
+            } else {
+                console.log('⚠️ Không tìm thấy GITHUB_TOKEN, sử dụng authentication hiện tại');
+            }
+            
+        } catch (error) {
+            console.error('Lỗi setup git auth:', error);
+            // Không throw error ở đây, để thử git pull trước
+        }
+    },
+
+    // Git pull với hỗ trợ private repository
+    async executeGitPull() {
+        try {
+            // Thử fetch trước để kiểm tra authentication
+            await this.executeCommand('git fetch origin');
+            
+            // Nếu fetch thành công, thực hiện pull
+            const pullResult = await this.executeCommand('git pull origin main');
+            console.log('Git pull result:', pullResult);
+            
+            return pullResult;
+            
+        } catch (error) {
+            // Nếu main branch không tồn tại, thử master
+            try {
+                console.log('Thử pull từ master branch...');
+                const pullResult = await this.executeCommand('git pull origin master');
+                console.log('Git pull master result:', pullResult);
+                return pullResult;
+            } catch (masterError) {
+                throw new Error(`Git pull failed: ${error.message}. Also tried master: ${masterError.message}`);
+            }
         }
     },
 
@@ -260,25 +327,40 @@ module.exports = {
 
     // Thực hiện force update
     async executeForceUpdate(message) {
-        const progressMsg = await message.reply('🔄 **FORCE UPDATE:** Đang backup và reset...');
+        const progressMsg = await message.reply('🔄 **FORCE UPDATE:** Đang backup và reset private repo...');
 
         try {
             // Backup trước khi reset
             await this.performBackup();
             
-            // Reset hard và pull
+            // Setup authentication cho private repo
+            await this.setupGitAuth();
+            
+            // Reset hard và pull từ private repo
             await this.executeCommand('git fetch origin');
-            await this.executeCommand('git reset --hard origin/main');
+            
+            // Thử reset về main hoặc master
+            try {
+                await this.executeCommand('git reset --hard origin/main');
+            } catch (error) {
+                console.log('Thử reset về master branch...');
+                await this.executeCommand('git reset --hard origin/master');
+            }
+            
             await this.executeCommand('npm install --production');
 
-            await progressMsg.edit('✅ **FORCE UPDATE:** Thành công! Đang restart...');
+            await progressMsg.edit('✅ **FORCE UPDATE:** Private repo đã reset thành công! Đang restart...');
             
             setTimeout(() => {
                 process.exit(0);
             }, 2000);
 
         } catch (error) {
-            await progressMsg.edit(`❌ **FORCE UPDATE:** Lỗi!\n\`\`\`${error.message}\`\`\``);
+            await progressMsg.edit(`❌ **FORCE UPDATE:** Lỗi private repo!\n\`\`\`${error.message}\`\`\`\n\n` +
+                '**💡 Kiểm tra:**\n' +
+                '• GITHUB_TOKEN trong .env\n' +
+                '• Quyền access token\n' +
+                '• Remote URL repository');
         }
     },
 

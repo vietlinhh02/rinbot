@@ -37,15 +37,26 @@ module.exports = {
             });
 
             const embed = new EmbedBuilder()
-                .setTitle('📝 DANH SÁCH NHẮC NHỞ')
-                .setDescription(`**👤 Của:** ${message.author.displayName}\n` +
-                    `**📊 Tổng cộng:** ${reminders.length} lời nhắc\n\n` +
-                    reminderList + '\n' +
-                    `**💡 Hướng dẫn:**\n` +
-                    `• Dùng \`,huynhacnho [số thứ tự]\` để hủy\n` +
-                    `• Dùng \`,nhacnho [thời gian] [nội dung]\` để tạo mới`)
+                .setTitle('📋 DANH SÁCH NHẮC NHỞ')
+                .setDescription(`### 👤 Của: ${message.author.displayName}\n**📊 Tổng cộng:** ${reminders.length} lời nhắc\n`)
+                .addFields(
+                    {
+                        name: '📝 Các nhắc nhở sắp tới',
+                        value: reminderList || 'Không có nhắc nhở nào.',
+                        inline: false
+                    },
+                    {
+                        name: '💡 Hướng dẫn sử dụng',
+                        value: '• `,huynhacnho [số]` - Hủy nhắc nhở\n• `,nhacnho [thời gian] [nội dung]` - Tạo mới\n• Bấm 🔄 để làm mới danh sách',
+                        inline: false
+                    }
+                )
                 .setColor('#0099FF')
-                .setFooter({ text: 'Hiển thị tối đa 10 nhắc nhở gần nhất' })
+                .setThumbnail('https://cdn-icons-png.flaticon.com/512/1827/1827422.png')
+                .setFooter({ 
+                    text: 'Hiển thị tối đa 10 nhắc nhở gần nhất',
+                    iconURL: message.client.user.displayAvatarURL()
+                })
                 .setTimestamp();
 
             // Tạo button để refresh hoặc clear all
@@ -113,19 +124,40 @@ module.exports = {
                     reminderList += `**${index + 1}.** ${timeStr} - ${truncatedMessage}\n`;
                 });
 
-                const embed = new EmbedBuilder()
-                    .setTitle('📝 DANH SÁCH NHẮC NHỞ (Đã làm mới)')
-                    .setDescription(`**👤 Của:** ${interaction.user.displayName}\n` +
-                        `**📊 Tổng cộng:** ${reminders.length} lời nhắc\n\n` +
-                        reminderList + '\n' +
-                        `**💡 Hướng dẫn:**\n` +
-                        `• Dùng \`,huynhacnho [số thứ tự]\` để hủy\n` +
-                        `• Dùng \`,nhacnho [thời gian] [nội dung]\` để tạo mới`)
-                    .setColor('#00FF00')
-                    .setFooter({ text: 'Danh sách đã được cập nhật • ' + new Date().toLocaleTimeString('vi-VN') })
+                const refreshEmbed = new EmbedBuilder()
+                    .setTitle('�� DANH SÁCH NHẮC NHỞ (Đã làm mới)')
+                    .setDescription(`### 👤 Của: ${interaction.user.displayName}\n**📊 Tổng cộng:** ${reminders.length} lời nhắc\n`)
+                    .addFields(
+                        {
+                            name: '📝 Các nhắc nhở sắp tới',
+                            value: reminderList || 'Không có nhắc nhở nào.',
+                            inline: false
+                        },
+                        {
+                            name: '💡 Hướng dẫn sử dụng',
+                            value: '• `,huynhacnho [số]` - Hủy nhắc nhở\n• `,nhacnho [thời gian] [nội dung]` - Tạo mới\n• Bấm 🔄 để làm mới danh sách',
+                            inline: false
+                        },
+                        {
+                            name: '🔄 Trạng thái',
+                            value: `Đã làm mới lúc ${new Date().toLocaleString('vi-VN', {
+                                timeZone: 'Asia/Ho_Chi_Minh',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                            })}`,
+                            inline: false
+                        }
+                    )
+                    .setColor('#32CD32')
+                    .setThumbnail('https://cdn-icons-png.flaticon.com/512/1827/1827422.png')
+                    .setFooter({ 
+                        text: 'Hiển thị tối đa 10 nhắc nhở gần nhất',
+                        iconURL: interaction.client.user.displayAvatarURL()
+                    })
                     .setTimestamp();
 
-                await interaction.update({ embeds: [embed], components: [] });
+                await interaction.update({ embeds: [refreshEmbed], components: [] });
 
             } catch (error) {
                 console.error('Lỗi refresh reminders:', error);
