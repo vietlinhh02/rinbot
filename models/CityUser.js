@@ -6,6 +6,11 @@ const cityUserSchema = new mongoose.Schema({
     job: String,
     jobStreak: { type: Number, default: 0 },
     lastWorked: Date,
+    lastWork: Date,
+    workStartTime: Date,
+    workProgress: { type: Number, default: 0 },
+    lastVoiceJoin: Date,
+    dailyVoiceMinutes: { type: Number, default: 0 },
     jailedUntil: Date,
     jailedBy: String,
     lastRepair: Date

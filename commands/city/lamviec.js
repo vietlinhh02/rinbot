@@ -43,6 +43,7 @@ module.exports = {
                 case 'trom':
                     return await this.handleThiefWork(message, cityUser, args);
                 case 'nhabao':
+                    return await this.handleChatWork(message, cityUser);
                 case 'mc':
                     return await this.handleVoiceWork(message, cityUser);
                 case 'congan':
@@ -262,53 +263,141 @@ module.exports = {
         }
     },
 
-    // Xử lý nghề MC (voice)
+    // Xử lý nghề Chat/Voice (Nhà Báo, MC)
     async handleVoiceWork(message, cityUser) {
         const job = JOB_TYPES[cityUser.job];
-        // Kiểm tra user có đang trong voice không
-        const member = await message.guild.members.fetch(message.author.id);
-        if (!member.voice.channel) {
-            return message.reply('❌ Bạn phải vào room voice để làm nghề MC!');
-        }
-        // Lấy thời gian join voice gần nhất (giả sử đã lưu ở cityUser.lastVoiceJoin)
         const now = new Date();
-        const lastJoin = cityUser.lastVoiceJoin ? new Date(cityUser.lastVoiceJoin) : now;
-        const minutes = Math.floor((now - lastJoin) / 60000);
-        if (minutes < job.minVoiceMinutes) {
-            return message.reply(`⏳ Bạn cần ngồi voice ít nhất ${job.minVoiceMinutes} phút mới nhận thưởng! (Đã: ${minutes} phút)`);
+        
+        if (cityUser.job === 'mc') {
+            // Xử lý nghề MC - Voice
+            const member = await message.guild.members.fetch(message.author.id);
+            
+            if (!member.voice.channel) {
+                // Nếu không ở voice, hiển thị hướng dẫn và thống kê
+                const lastJoin = cityUser.lastVoiceJoin ? new Date(cityUser.lastVoiceJoin) : null;
+                const voiceMinutes = lastJoin ? Math.floor((now - lastJoin) / 60000) : 0;
+                const dailyProgress = cityUser.dailyVoiceMinutes || 0;
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const isNewDay = !cityUser.lastWork || new Date(cityUser.lastWork) < todayStart;
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('🎤 NGHỀ MC - THỐNG KÊ')
+                    .setDescription(`**📊 Tiến độ hôm nay:**\n` +
+                        `• **Voice đã ngồi:** ${isNewDay ? 0 : dailyProgress} phút\n` +
+                        `• **Cần hoàn thành:** ${job.minVoiceMinutes} phút\n` +
+                        `• **Còn thiếu:** ${Math.max(0, job.minVoiceMinutes - (isNewDay ? 0 : dailyProgress))} phút\n\n` +
+                        `**💰 Thưởng:** ${job.rewardPerDay} Rin khi hoàn thành\n` +
+                        `**⏰ Cooldown:** ${this.formatCooldown(job.cooldown)}\n\n` +
+                        `**📋 Hướng dẫn:**\n` +
+                        `• Vào bất kỳ room voice nào trong server\n` +
+                        `• Dùng \`,lamviec\` khi đang ở voice để check tiến độ\n` +
+                        `• Ngồi đủ ${job.minVoiceMinutes} phút trong ngày để nhận thưởng\n\n` +
+                        `⚠️ **Bạn phải vào voice để tiếp tục!**`)
+                    .setColor(COLORS.warning)
+                    .setThumbnail(JOB_IMAGES.mc);
+                
+                return message.reply({ embeds: [embed] });
+            }
+            
+            // Nếu đang ở voice, tính thời gian và cập nhật
+            const lastJoin = cityUser.lastVoiceJoin ? new Date(cityUser.lastVoiceJoin) : now;
+            const sessionMinutes = Math.floor((now - lastJoin) / 60000);
+            const dailyProgress = cityUser.dailyVoiceMinutes || 0;
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const isNewDay = !cityUser.lastWork || new Date(cityUser.lastWork) < todayStart;
+            
+            // Reset nếu là ngày mới
+            const currentDaily = isNewDay ? sessionMinutes : dailyProgress + sessionMinutes;
+            
+            if (currentDaily >= job.minVoiceMinutes) {
+                // Hoàn thành công việc
+                await updateUserRin(message.author.id, job.rewardPerDay);
+                await updateCityUser(message.author.id, { 
+                    lastWork: now,
+                    lastVoiceJoin: null,
+                    dailyVoiceMinutes: 0
+                });
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('🎉 MC - HOÀN THÀNH CÔNG VIỆC!')
+                    .setDescription(`**✅ Chúc mừng! Bạn đã hoàn thành ca làm MC!**\n\n` +
+                        `• **Thời gian voice hôm nay:** ${currentDaily} phút\n` +
+                        `• **Yêu cầu:** ${job.minVoiceMinutes} phút\n` +
+                        `• **Thưởng nhận được:** ${job.rewardPerDay} Rin\n\n` +
+                        `**⏰ Cooldown:** ${this.formatCooldown(job.cooldown)}\n` +
+                        `Hãy nghỉ ngơi và quay lại sau!`)
+                    .setColor(COLORS.success)
+                    .setThumbnail(JOB_IMAGES.mc);
+                
+                return message.reply({ embeds: [embed] });
+            } else {
+                // Cập nhật tiến độ
+                await updateCityUser(message.author.id, {
+                    lastVoiceJoin: lastJoin,
+                    dailyVoiceMinutes: currentDaily
+                });
+                
+                const embed = new EmbedBuilder()
+                    .setTitle('🎤 MC - TIẾN ĐỘ VOICE')
+                    .setDescription(`**📊 Thống kê thời gian voice:**\n\n` +
+                        `• **Session hiện tại:** ${sessionMinutes} phút\n` +
+                        `• **Tổng hôm nay:** ${currentDaily} phút\n` +
+                        `• **Mục tiêu:** ${job.minVoiceMinutes} phút\n` +
+                        `• **Còn thiếu:** ${job.minVoiceMinutes - currentDaily} phút\n` +
+                        `• **Tiến độ:** ${Math.round((currentDaily / job.minVoiceMinutes) * 100)}%\n\n` +
+                        `**💰 Thưởng khi hoàn thành:** ${job.rewardPerDay} Rin\n\n` +
+                        `📍 **Bạn đang ở:** ${member.voice.channel.name}\n` +
+                        `⏰ **Thời gian bắt đầu:** ${lastJoin.toLocaleTimeString('vi-VN')}\n\n` +
+                        `💡 **Tip:** Tiếp tục ngồi voice để tích lũy thời gian!`)
+                    .setColor(COLORS.info)
+                    .setThumbnail(JOB_IMAGES.mc);
+                
+                return message.reply({ embeds: [embed] });
+            }
+            
+        } else if (cityUser.job === 'nhabao') {
+            // Xử lý nghề Nhà báo - Chat
+            const currentProgress = cityUser.workProgress || 0;
+            const isWorking = cityUser.workStartTime && !cityUser.lastWork;
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const lastWorkDate = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
+            const isNewDay = !lastWorkDate || lastWorkDate < todayStart;
+            
+            if (currentProgress >= job.targetMessages && !isNewDay) {
+                return message.reply('✅ Bạn đã hoàn thành ca làm Nhà báo hôm nay! Hãy nghỉ và chờ cooldown.');
+            }
+            
+            if (!isWorking) {
+                // Bắt đầu ca làm mới
+                await updateCityUser(message.author.id, { 
+                    workStartTime: now,
+                    workProgress: isNewDay ? 0 : currentProgress
+                });
+            }
+            
+            const resetProgress = isNewDay ? 0 : currentProgress;
+            
+            const embed = new EmbedBuilder()
+                .setTitle('📰 NGHỀ NHÀ BÁO - THỐNG KÊ')
+                .setDescription(`**📊 Tiến độ chat:**\n\n` +
+                    `• **Tin nhắn đã chat:** ${resetProgress}/${job.targetMessages}\n` +
+                    `• **Còn thiếu:** ${Math.max(0, job.targetMessages - resetProgress)} tin nhắn\n` +
+                    `• **Tiến độ:** ${Math.round((resetProgress / job.targetMessages) * 100)}%\n` +
+                    `• **Thưởng/tin nhắn:** ${job.rewardPerMessage} Rin\n` +
+                    `• **Tổng thưởng:** ${job.targetMessages * job.rewardPerMessage} Rin\n\n` +
+                    `**📋 Hướng dẫn:**\n` +
+                    `• Chat bình thường trong server này\n` +
+                    `• Mỗi tin nhắn được tính và nhận tiền ngay\n` +
+                    `• Dùng \`,lamviec\` để check tiến độ\n` +
+                    `• Chat đủ ${job.targetMessages} tin nhắn để hoàn thành\n\n` +
+                    `**⏰ Cooldown:** ${this.formatCooldown(job.cooldown)}\n\n` +
+                    `${isWorking ? '✅ **Ca làm đang diễn ra**' : '🚀 **Bắt đầu ca làm mới**'}\n` +
+                    `💬 **Hãy bắt đầu chat để tích lũy tiến độ!**`)
+                .setColor(isWorking ? COLORS.info : COLORS.success)
+                .setThumbnail(JOB_IMAGES.nhabao);
+            
+            return message.reply({ embeds: [embed] });
         }
-        // Thưởng
-        await updateUserRin(message.author.id, job.rewardPerDay);
-        await updateCityUser(message.author.id, { lastVoiceJoin: null });
-        return message.reply(`🎤 Nghề MC: Bạn đã nhận ${job.rewardPerDay} Rin cho ${job.minVoiceMinutes} phút voice!`);
-    },
-
-    // Xử lý nghề Chat (Nhà Báo, MC)
-    async handleChatWork(message, cityUser) {
-        const job = JOB_TYPES[cityUser.job];
-        const currentProgress = cityUser.workProgress || 0;
-
-        if (currentProgress >= job.targetMessages) {
-            return message.reply('✅ Bạn đã hoàn thành công việc! Hãy nghỉ và chờ cooldown để làm ca mới.');
-        }
-
-        const embed = new EmbedBuilder()
-            .setTitle(`📰 BẮT ĐẦU CA LÀM ${job.name.toUpperCase()}`)
-            .setDescription(`**Nhiệm vụ:** Chat ${job.targetMessages} tin nhắn trong server\n` +
-                `**Tiến độ hiện tại:** ${currentProgress}/${job.targetMessages} tin nhắn\n` +
-                `**Thưởng:** ${job.rewardPerMessage} Rin/tin nhắn\n\n` +
-                `**📝 Bắt đầu chat để tích lũy tiến độ!**\n` +
-                `Mỗi tin nhắn sẽ được tính và bạn nhận tiền ngay lập tức.`)
-            .setColor(COLORS.city)
-            .setThumbnail(JOB_IMAGES[cityUser.job]);
-
-        // Bắt đầu ca làm
-        await updateCityUser(message.author.id, { 
-            workStartTime: new Date(),
-            workProgress: currentProgress 
-        });
-
-        await message.reply({ embeds: [embed] });
     },
 
     // Xử lý nghề Công An  
@@ -417,6 +506,18 @@ module.exports = {
 
         } catch (error) {
             await message.reply('⏰ Hết thời gian! Trộm đã thoát!');
+        }
+    },
+
+    // Helper functions
+    formatCooldown(milliseconds) {
+        const hours = Math.floor(milliseconds / (60 * 60 * 1000));
+        const minutes = Math.floor((milliseconds % (60 * 60 * 1000)) / (60 * 1000));
+        
+        if (hours > 0) {
+            return `${hours} giờ${minutes > 0 ? ` ${minutes} phút` : ''}`;
+        } else {
+            return `${minutes} phút`;
         }
     }
 };

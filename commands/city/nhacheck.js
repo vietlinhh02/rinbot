@@ -48,12 +48,47 @@ module.exports = {
                          `**⏰ Trạng thái:** ${canWork ? '✅ Có thể làm việc' : '⏳ Đang nghỉ'}\n` +
                          `**🔄 Cooldown:** ${this.formatCooldown(job.cooldown)}\n`;
                 
-                // Thông tin tiến độ cho nghề chat
-                if (job.workType === 'chat_messages' && cityUser.workProgress > 0) {
+                // Thông tin tiến độ chi tiết cho từng nghề
+                if (cityUser.job === 'nhabao') {
                     const progress = cityUser.workProgress || 0;
                     const target = job.targetMessages;
                     const percentage = Math.round((progress / target) * 100);
-                    jobInfo += `**📊 Tiến độ:** ${progress}/${target} tin nhắn (${percentage}%)\n`;
+                    const isWorking = cityUser.workStartTime && !cityUser.lastWork;
+                    
+                    jobInfo += `**📊 Tiến độ chat:** ${progress}/${target} tin nhắn (${percentage}%)\n`;
+                    jobInfo += `**💰 Thưởng/tin nhắn:** ${job.rewardPerMessage} Rin\n`;
+                    jobInfo += `**🎯 Trạng thái ca làm:** ${isWorking ? '🟢 Đang làm việc' : '🔴 Chưa bắt đầu'}\n`;
+                    
+                    if (isWorking) {
+                        const workStart = new Date(cityUser.workStartTime);
+                        const workTime = Math.floor((now - workStart) / 60000);
+                        jobInfo += `**⏱️ Thời gian làm:** ${workTime} phút\n`;
+                    }
+                } else if (cityUser.job === 'mc') {
+                    const dailyProgress = cityUser.dailyVoiceMinutes || 0;
+                    const target = job.minVoiceMinutes;
+                    const percentage = Math.round((dailyProgress / target) * 100);
+                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const isNewDay = !lastWork || lastWork < todayStart;
+                    const actualProgress = isNewDay ? 0 : dailyProgress;
+                    
+                    jobInfo += `**🎤 Tiến độ voice:** ${actualProgress}/${target} phút (${Math.round((actualProgress / target) * 100)}%)\n`;
+                    jobInfo += `**💰 Thưởng/ngày:** ${job.rewardPerDay} Rin\n`;
+                    
+                    if (cityUser.lastVoiceJoin) {
+                        const sessionTime = Math.floor((now - new Date(cityUser.lastVoiceJoin)) / 60000);
+                        jobInfo += `**📍 Voice hiện tại:** ${sessionTime} phút\n`;
+                    } else {
+                        jobInfo += `**📍 Voice hiện tại:** Không ở voice\n`;
+                    }
+                } else if (cityUser.job === 'trom') {
+                    jobInfo += `**⚠️ Rủi ro bị bắt:** ${Math.round(job.riskChance * 100)}%\n`;
+                    jobInfo += `**⏰ Cooldown đặc biệt:** 2 phút/lần trộm\n`;
+                    jobInfo += `**🕐 Giờ trộm tiền:** 19:00 - 21:00\n`;
+                } else if (cityUser.job === 'congan') {
+                    jobInfo += `**🎯 Nhiệm vụ:** Bắt trộm và giải đố\n`;
+                    jobInfo += `**⚡ Thời gian bắt:** 10 phút/trộm\n`;
+                    jobInfo += `**🧩 Yêu cầu:** Giải đúng câu đố\n`;
                 }
             } else {
                 jobInfo = '**💼 Nghề nghiệp:** Chưa có\n**💡 Tip:** Dùng `,dangkynghe` để đăng ký nghề!\n';
