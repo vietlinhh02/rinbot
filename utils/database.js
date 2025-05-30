@@ -163,7 +163,7 @@ const getGuildPrefix = async (guildId) => {
         const guild = await Guild.findOne({ guildId });
         if (!guild) {
             // Không tự động tạo guild, trả về null để dùng prefix từ .env hoặc default
-            return null;
+            return ",";
         }
         return guild.prefix;
     } catch (error) {
