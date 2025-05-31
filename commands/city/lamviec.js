@@ -20,21 +20,40 @@ module.exports = {
             const job = JOB_TYPES[cityUser.job];
             const now = new Date();
             const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
+            
+            // Kiểm tra đã làm việc hôm nay chưa
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const hasWorkedToday = lastWork && lastWork >= todayStart;
 
-            // Kiểm tra cooldown - riêng cho trộm là 2 phút
-            let cooldownTime = job.cooldown;
+            // Nghề trộm và công an có cooldown riêng, không giới hạn 1 lần/ngày
             if (cityUser.job === 'trom') {
-                cooldownTime = 2 * 60 * 1000; // 2 phút
-            }
-
-            if (lastWork && (now - lastWork) < cooldownTime) {
-                const timeLeft = cooldownTime - (now - lastWork);
-                const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
-                if (cityUser.job === 'trom') {
+                const cooldownTime = 2 * 60 * 1000; // 2 phút
+                if (lastWork && (now - lastWork) < cooldownTime) {
+                    const timeLeft = cooldownTime - (now - lastWork);
+                    const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
                     return message.reply(`⏰ Bạn cần nghỉ thêm **${minutesLeft} phút** nữa mới có thể trộm tiếp!`);
-                } else {
-                    const hoursLeft = Math.ceil(timeLeft / (60 * 60 * 1000));
-                    return message.reply(`⏰ Bạn cần nghỉ thêm **${hoursLeft} giờ** nữa mới có thể làm việc tiếp!`);
+                }
+            } else if (cityUser.job === 'congan') {
+                const cooldownTime = job.cooldown; // 1 giờ
+                if (lastWork && (now - lastWork) < cooldownTime) {
+                    const timeLeft = cooldownTime - (now - lastWork);
+                    const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
+                    const hoursLeft = Math.floor(minutesLeft / 60);
+                    const remainingMinutes = minutesLeft % 60;
+                    
+                    const timeString = hoursLeft > 0 ? `${hoursLeft}h ${remainingMinutes}p` : `${remainingMinutes} phút`;
+                    return message.reply(`⏰ Bạn cần nghỉ thêm **${timeString}** nữa mới có thể tuần tra tiếp!`);
+                }
+            } else {
+                // Các nghề khác (nhà báo, MC) kiểm tra 1 lần/ngày
+                if (hasWorkedToday) {
+                    const tomorrow = new Date(todayStart);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    const timeUntilTomorrow = tomorrow - now;
+                    const hoursLeft = Math.floor(timeUntilTomorrow / (60 * 60 * 1000));
+                    const minutesLeft = Math.floor((timeUntilTomorrow % (60 * 60 * 1000)) / (60 * 1000));
+                    
+                    return message.reply(`✅ Bạn đã làm việc hôm nay rồi!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)`);
                 }
             }
 
@@ -294,15 +313,17 @@ module.exports = {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
-        const isNewDay = !lastWork || lastWork < todayStart;
+        const hasWorkedToday = lastWork && lastWork >= todayStart;
         
-        // Kiểm tra cooldown
-        const canWork = !lastWork || (now - lastWork) >= job.cooldown;
-        
-        if (!canWork) {
-            const timeLeft = job.cooldown - (now - lastWork);
-            const hoursLeft = Math.ceil(timeLeft / (60 * 60 * 1000));
-            return message.reply(`⏰ Bạn cần nghỉ thêm **${hoursLeft} giờ** nữa mới có thể làm việc tiếp!`);
+        // Nếu đã hoàn thành hôm nay thì không cho làm nữa
+        if (hasWorkedToday) {
+            const tomorrow = new Date(todayStart);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const timeUntilTomorrow = tomorrow - now;
+            const hoursLeft = Math.floor(timeUntilTomorrow / (60 * 60 * 1000));
+            const minutesLeft = Math.floor((timeUntilTomorrow % (60 * 60 * 1000)) / (60 * 1000));
+            
+            return message.reply(`✅ Bạn đã hoàn thành ca làm MC hôm nay!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)`);
         }
         
         // Chỉ xử lý nghề MC - Voice
@@ -311,24 +332,19 @@ module.exports = {
         
         const lastJoin = cityUser.lastVoiceJoin ? new Date(cityUser.lastVoiceJoin) : null;
         const dailyProgress = cityUser.dailyVoiceMinutes || 0;
-        const actualProgress = isNewDay ? 0 : dailyProgress;
+        
+        // Reset tiến độ cho ngày mới
+        const actualProgress = hasWorkedToday ? dailyProgress : 0;
         
         // Tính thời gian session hiện tại nếu đang ở voice
         let sessionMinutes = 0;
-        if (isInVoice && lastJoin) {
+        if (isInVoice && lastJoin && !hasWorkedToday) {
             sessionMinutes = Math.floor((now - lastJoin) / 60000);
         }
         
         const totalToday = actualProgress + sessionMinutes;
         const remainingMinutes = Math.max(0, job.minVoiceMinutes - totalToday);
         const progressPercent = Math.round((totalToday / job.minVoiceMinutes) * 100);
-        
-        // Kiểm tra đã hoàn thành chưa
-        if (totalToday >= job.minVoiceMinutes && !isNewDay && lastWork) {
-            const timeLeft = job.cooldown - (now - lastWork);
-            const hoursLeft = Math.ceil(timeLeft / (60 * 60 * 1000));
-            return message.reply(`✅ Bạn đã hoàn thành ca làm MC hôm nay!\n⏰ Cooldown còn: **${hoursLeft} giờ**`);
-        }
         
         const embed = new EmbedBuilder()
             .setTitle('🎤 NGHỀ MC - THỐNG KÊ CHI TIẾT')
@@ -343,21 +359,21 @@ module.exports = {
                 `**⏰ Thời gian:**\n` +
                 `• **Session hiện tại:** ${sessionMinutes} phút\n` +
                 `• **Tích lũy hôm nay:** ${actualProgress} phút\n` +
-                `• **Cooldown:** ${this.formatCooldown(job.cooldown)}\n\n` +
+                `• **Giới hạn:** 1 lần/ngày (reset 0:00)\n\n` +
                 `**📍 Trạng thái Voice:**\n` +
                 `• **Hiện tại:** ${isInVoice ? `🟢 Đang ở ${member.voice.channel.name}` : '🔴 Không ở voice'}\n` +
-                `${lastJoin ? `• **Bắt đầu session:** ${lastJoin.toLocaleTimeString('vi-VN')}\n` : ''}` +
-                `${isInVoice ? `• **Thời gian session:** ${sessionMinutes} phút\n` : ''}\n` +
+                `${lastJoin && !hasWorkedToday ? `• **Bắt đầu session:** ${lastJoin.toLocaleTimeString('vi-VN')}\n` : ''}` +
+                `${isInVoice && !hasWorkedToday ? `• **Thời gian session:** ${sessionMinutes} phút\n` : ''}\n` +
                 `**📋 Hướng dẫn:**\n` +
                 `• Vào bất kỳ room voice nào trong server\n` +
                 `• Bot tự động tính thời gian khi bạn ở voice\n` +
                 `• Dùng \`,lamviec\` để check tiến độ\n` +
                 `• Ngồi đủ ${job.minVoiceMinutes} phút trong ngày để nhận thưởng\n\n` +
-                `${isInVoice ? '🎤 **Đang tích lũy thời gian voice!**' : '⚠️ **Hãy vào voice để bắt đầu tích lũy!**'}`)
-            .setColor(isInVoice ? COLORS.success : COLORS.warning)
+                `${isInVoice && !hasWorkedToday ? '🎤 **Đang tích lũy thời gian voice!**' : hasWorkedToday ? '✅ **Đã hoàn thành hôm nay!**' : '⚠️ **Hãy vào voice để bắt đầu tích lũy!**'}`)
+            .setColor(hasWorkedToday ? COLORS.success : (isInVoice ? COLORS.info : COLORS.warning))
             .setThumbnail(JOB_IMAGES.mc)
             .setFooter({ 
-                text: `${isInVoice ? 'Đang tích lũy thời gian' : 'Cần vào voice'} | ${totalToday}/${job.minVoiceMinutes} phút` 
+                text: `${hasWorkedToday ? 'Đã hoàn thành' : (isInVoice ? 'Đang tích lũy thời gian' : 'Cần vào voice')} | 1 lần/ngày` 
             });
         
         return message.reply({ embeds: [embed] });
@@ -372,34 +388,29 @@ module.exports = {
         const isWorking = cityUser.workStartTime && !cityUser.lastWork;
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const lastWorkDate = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
-        const isNewDay = !lastWorkDate || lastWorkDate < todayStart;
+        const hasWorkedToday = lastWorkDate && lastWorkDate >= todayStart;
         
-        // Kiểm tra cooldown
-        const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
-        const canWork = !lastWork || (now - lastWork) >= job.cooldown;
-        
-        if (currentProgress >= job.targetMessages && !isNewDay) {
-            const timeLeft = job.cooldown - (now - lastWork);
-            const hoursLeft = Math.ceil(timeLeft / (60 * 60 * 1000));
-            return message.reply(`✅ Bạn đã hoàn thành ca làm Nhà báo hôm nay!\n⏰ Cooldown còn: **${hoursLeft} giờ**`);
-        }
-        
-        if (!canWork) {
-            const timeLeft = job.cooldown - (now - lastWork);
-            const hoursLeft = Math.ceil(timeLeft / (60 * 60 * 1000));
-            return message.reply(`⏰ Bạn cần nghỉ thêm **${hoursLeft} giờ** nữa mới có thể làm việc tiếp!`);
+        // Nếu đã hoàn thành hôm nay thì không cho làm nữa
+        if (hasWorkedToday) {
+            const tomorrow = new Date(todayStart);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const timeUntilTomorrow = tomorrow - now;
+            const hoursLeft = Math.floor(timeUntilTomorrow / (60 * 60 * 1000));
+            const minutesLeft = Math.floor((timeUntilTomorrow % (60 * 60 * 1000)) / (60 * 1000));
+            
+            return message.reply(`✅ Bạn đã hoàn thành ca làm Nhà báo hôm nay!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)`);
         }
         
         if (!isWorking) {
-            // Bắt đầu ca làm mới
+            // Bắt đầu ca làm mới - reset tiến độ về 0 cho ngày mới
             await updateCityUser(message.author.id, { 
                 workStartTime: now,
-                workProgress: isNewDay ? 0 : currentProgress
+                workProgress: 0
             });
         }
         
-        // Hiển thị tiến độ thực tế hiện tại (không reset về 0)
-        const displayProgress = currentProgress;
+        // Hiển thị tiến độ thực tế hiện tại
+        const displayProgress = isWorking ? currentProgress : 0;
         const workTimeMinutes = isWorking ? Math.floor((now - new Date(cityUser.workStartTime)) / 60000) : 0;
         
         const embed = new EmbedBuilder()
@@ -416,7 +427,7 @@ module.exports = {
                 `**⏰ Thời gian:**\n` +
                 `• **Trạng thái ca làm:** ${isWorking ? '🟢 Đang làm việc' : '🚀 Bắt đầu ca mới'}\n` +
                 `• **Thời gian làm việc:** ${workTimeMinutes} phút\n` +
-                `• **Cooldown:** ${this.formatCooldown(job.cooldown)}\n\n` +
+                `• **Giới hạn:** 1 lần/ngày (reset 0:00)\n\n` +
                 `**📋 Hướng dẫn:**\n` +
                 `• Chat bình thường trong server này\n` +
                 `• Mỗi tin nhắn được tính và nhận tiền ngay\n` +
@@ -425,7 +436,7 @@ module.exports = {
                 `💬 **Hãy bắt đầu chat để tích lũy tiến độ!**`)
             .setColor(isWorking ? COLORS.info : COLORS.success)
             .setThumbnail(JOB_IMAGES.nhabao)
-            .setFooter({ text: `${isWorking ? 'Ca làm đang diễn ra' : 'Bắt đầu ca làm mới'} | Nhắn tin để tích lũy!` });
+            .setFooter({ text: `${isWorking ? 'Ca làm đang diễn ra' : 'Bắt đầu ca làm mới'} | 1 lần/ngày` });
         
         return message.reply({ embeds: [embed] });
     },
@@ -440,8 +451,12 @@ module.exports = {
         let cooldownInfo = '';
         if (!canWork) {
             const timeLeft = job.cooldown - (now - lastWork);
-            const hoursLeft = Math.ceil(timeLeft / (60 * 60 * 1000));
-            cooldownInfo = `⏰ **Cooldown:** Còn ${hoursLeft} giờ nữa mới có thể tuần tra tiếp!\n\n`;
+            const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
+            const hoursLeft = Math.floor(minutesLeft / 60);
+            const remainingMinutes = minutesLeft % 60;
+            
+            const timeString = hoursLeft > 0 ? `${hoursLeft}h ${remainingMinutes}p` : `${remainingMinutes} phút`;
+            cooldownInfo = `⏰ **Cooldown:** Còn ${timeString} nữa mới có thể tuần tra tiếp!\n\n`;
         }
         
         // Đếm số record trộm hiện tại (nếu có)
@@ -476,12 +491,29 @@ module.exports = {
                 `• **Cooldown tuần tra:** ${this.formatCooldown(job.cooldown)}\n\n` +
                 `${canWork ? (activeThefts > 0 ? '🚨 **Có trộm đang hoạt động! Hãy bắt ngay!**' : '👮 **Đang tuần tra, sẵn sàng bắt trộm!**') : '⏰ **Đang nghỉ, chờ cooldown!**'}`)
             .setColor(canWork ? (activeThefts > 0 ? COLORS.error : COLORS.info) : COLORS.warning)
-            .setThumbnail(JOB_IMAGES.congan)
-            .setFooter({ 
-                text: `${canWork ? (activeThefts > 0 ? `${activeThefts} trộm đang truy nã` : 'Đang tuần tra') : `Cooldown còn ${Math.ceil((job.cooldown - (now - lastWork)) / (60 * 60 * 1000))} giờ`} | Bảo vệ trật tự!` 
-            });
+            .setThumbnail(JOB_IMAGES.congan);
 
-        await updateCityUser(message.author.id, { lastWork: new Date() });
+        // Footer hiển thị cooldown chính xác
+        let footerText = '';
+        if (canWork) {
+            footerText = activeThefts > 0 ? `${activeThefts} trộm đang truy nã` : 'Đang tuần tra';
+        } else {
+            const timeLeft = job.cooldown - (now - lastWork);
+            const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
+            const hoursLeft = Math.floor(minutesLeft / 60);
+            const remainingMinutes = minutesLeft % 60;
+            
+            const timeString = hoursLeft > 0 ? `${hoursLeft}h ${remainingMinutes}p` : `${remainingMinutes} phút`;
+            footerText = `Cooldown còn ${timeString}`;
+        }
+        
+        embed.setFooter({ text: `${footerText} | Có thể làm liên tục!` });
+
+        // Chỉ cập nhật lastWork khi có thể làm việc
+        if (canWork) {
+            await updateCityUser(message.author.id, { lastWork: new Date() });
+        }
+        
         await message.reply({ embeds: [embed] });
     },
 

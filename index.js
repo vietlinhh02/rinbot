@@ -121,6 +121,17 @@ client.on('messageCreate', async (message) => {
                 const job = JOB_TYPES[cityUser.job];
                 const currentProgress = cityUser.workProgress || 0;
                 
+                // Kiểm tra đã hoàn thành hôm nay chưa
+                const now = new Date();
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
+                const hasWorkedToday = lastWork && lastWork >= todayStart;
+                
+                // Nếu đã hoàn thành hôm nay thì không tính tiến độ nữa
+                if (hasWorkedToday) {
+                    return;
+                }
+                
                 // Kiểm tra xem đã hoàn thành chưa
                 if (currentProgress < job.targetMessages) {
                     const newProgress = currentProgress + 1;
@@ -163,14 +174,14 @@ client.on('messageCreate', async (message) => {
                         
                         const embed = new EmbedBuilder()
                             .setTitle('🎉 HOÀN THÀNH CA LÀM VIỆC!')
-                            .setDescription(`**${job.name}** ${message.author.displayName} đã hoàn thành ca làm!\n\n` +
+                            .setDescription(`**${job.name}** ${message.author.displayName} đã hoàn thành ca làm hôm nay!\n\n` +
                                 `**📊 Thành tích:**\n` +
                                 `• Tin nhắn: ${newProgress}/${job.targetMessages}\n` +
                                 `• Tổng thu nhập: ${(newProgress * job.rewardPerMessage).toLocaleString()} Rin\n\n` +
-                                `**⏰ Cooldown:** ${Math.floor(job.cooldown / (60 * 60 * 1000))} giờ\n\n` +
+                                `**⏰ Làm việc tiếp theo:** Ngày mai (0:00)\n\n` +
                                 `**Chúc mừng! 🎊**`)
                             .setColor(COLORS.success)
-                            .setFooter({ text: 'Hãy nghỉ ngơi và quay lại sau!' });
+                            .setFooter({ text: 'Hãy nghỉ ngơi và quay lại vào ngày mai!' });
                         
                         await message.channel.send({ embeds: [embed] });
                         
@@ -572,17 +583,23 @@ const setupCronJobs = () => {
                         if (cityUser && cityUser.job === 'mc' && cityUser.lastVoiceJoin) {
                             const job = JOB_TYPES.mc;
                             const now = new Date();
+                            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
+                            const hasWorkedToday = lastWork && lastWork >= todayStart;
+                            
+                            // Nếu đã làm việc hôm nay rồi thì không tính nữa
+                            if (hasWorkedToday) {
+                                continue;
+                            }
+                            
                             const lastJoin = new Date(cityUser.lastVoiceJoin);
                             const sessionMinutes = Math.floor((now - lastJoin) / 60000);
                             const dailyProgress = cityUser.dailyVoiceMinutes || 0;
-                            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                            const isNewDay = !cityUser.lastWork || new Date(cityUser.lastWork) < todayStart;
                             
-                            // Reset nếu là ngày mới
-                            const currentDaily = isNewDay ? sessionMinutes : dailyProgress + sessionMinutes;
+                            const currentDaily = dailyProgress + sessionMinutes;
                             
-                            // Kiểm tra nếu đủ điều kiện hoàn thành và chưa hoàn thành hôm nay
-                            if (currentDaily >= job.minVoiceMinutes && (isNewDay || dailyProgress < job.minVoiceMinutes)) {
+                            // Kiểm tra nếu đủ điều kiện hoàn thành
+                            if (currentDaily >= job.minVoiceMinutes) {
                                 // Hoàn thành công việc
                                 await updateUserRin(member.id, job.rewardPerDay);
                                 await updateCityUser(member.id, { 
@@ -593,12 +610,12 @@ const setupCronJobs = () => {
                                 
                                 const embed = new EmbedBuilder()
                                     .setTitle('🎉 MC - HOÀN THÀNH CÔNG VIỆC!')
-                                    .setDescription(`**✅ Chúc mừng ${member.displayName}! Bạn đã hoàn thành ca làm MC!**\n\n` +
+                                    .setDescription(`**✅ Chúc mừng ${member.displayName}! Bạn đã hoàn thành ca làm MC hôm nay!**\n\n` +
                                         `• **Thời gian voice hôm nay:** ${currentDaily} phút\n` +
                                         `• **Yêu cầu:** ${job.minVoiceMinutes} phút\n` +
                                         `• **Thưởng nhận được:** ${job.rewardPerDay} Rin\n\n` +
-                                        `**⏰ Cooldown:** ${Math.floor(job.cooldown / (60 * 60 * 1000))} giờ\n` +
-                                        `Hãy nghỉ ngơi và quay lại sau!`)
+                                        `**⏰ Làm việc tiếp theo:** Ngày mai (0:00)\n` +
+                                        `Hãy nghỉ ngơi và quay lại vào ngày mai!`)
                                     .setColor(COLORS.success);
                                 
                                 // Gửi thông báo đến channel chính
@@ -607,7 +624,7 @@ const setupCronJobs = () => {
                                 if (targetChannel) {
                                     await targetChannel.send({ embeds: [embed] });
                                 }
-                                console.log(`🎉 MC ${member.displayName} đã hoàn thành ca làm tự động!`);
+                                console.log(`🎉 MC ${member.displayName} đã hoàn thành ca làm hôm nay!`);
                             } else if (sessionMinutes > 0) {
                                 // Cập nhật tiến độ
                                 await updateCityUser(member.id, {
