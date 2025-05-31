@@ -6,6 +6,10 @@ const { connectDB, getGuildPrefix, getAllGuildPrefixes } = require('./utils/data
 const cron = require('node-cron');
 const ReminderScheduler = require('./utils/reminderScheduler');
 
+// Auto-restart counter
+let restartCount = 0;
+const MAX_RESTARTS = 10;
+
 // Tạo bot client với intents đầy đủ
 const client = new Client({
     intents: [
@@ -13,7 +17,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent, 
         GatewayIntentBits.GuildMembers,    
-        GatewayIntentBits.GuildMessageReactions
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildVoiceStates
     ]
 });
 
@@ -25,7 +30,31 @@ global.games = {};
 global.typhuRooms = {};
 
 // Khởi tạo ReminderScheduler
-const reminderScheduler = new ReminderScheduler(client);
+let reminderScheduler;
+
+// Global error handlers để tránh crash
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    console.log('🔄 Attempting to continue...');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+    console.log('🔄 Attempting to continue...');
+});
+
+// Graceful shutdown handler
+process.on('SIGINT', () => {
+    console.log('🛑 Received SIGINT. Graceful shutdown...');
+    client.destroy();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    console.log('🛑 Received SIGTERM. Graceful shutdown...');
+    client.destroy();
+    process.exit(0);
+});
 
 // Function cập nhật Bot Activity động
 const updateBotActivity = async () => {
@@ -50,9 +79,13 @@ const updateBotActivity = async () => {
     } catch (error) {
         console.error('Lỗi cập nhật bot activity:', error);
         // Fallback về hiển thị cơ bản
-        client.user.setActivity(`RinBot | Prefix: ${config.prefix} | ,setprefix`, { 
-            type: 'PLAYING' 
-        });
+        try {
+            client.user.setActivity(`RinBot | Prefix: ${config.prefix} | ,setprefix`, { 
+                type: 'PLAYING' 
+            });
+        } catch (fallbackError) {
+            console.error('Lỗi fallback activity:', fallbackError);
+        }
     }
 };
 
@@ -61,32 +94,71 @@ global.updateBotActivity = updateBotActivity;
 
 // Load commands
 const loadCommands = () => {
-    const commandFolders = fs.readdirSync('./commands');
-    
-    for (const folder of commandFolders) {
-        const commandFiles = fs.readdirSync(`./commands/${folder}`).filter(file => file.endsWith('.js'));
+    try {
+        const commandFolders = fs.readdirSync('./commands');
         
-        for (const file of commandFiles) {
-            const command = require(`./commands/${folder}/${file}`);
-            if (command.name) {
-                client.commands.set(command.name, command);
+        for (const folder of commandFolders) {
+            const commandFiles = fs.readdirSync(`./commands/${folder}`).filter(file => file.endsWith('.js'));
+            
+            for (const file of commandFiles) {
+                try {
+                    delete require.cache[require.resolve(`./commands/${folder}/${file}`)];
+                    const command = require(`./commands/${folder}/${file}`);
+                    if (command.name) {
+                        client.commands.set(command.name, command);
+                    }
+                } catch (error) {
+                    console.error(`❌ Lỗi load command ${file}:`, error.message);
+                }
             }
         }
+        
+        console.log(`✅ Đã load ${client.commands.size} commands`);
+    } catch (error) {
+        console.error('❌ Lỗi load commands:', error);
     }
-    
-    console.log(`✅ Đã load ${client.commands.size} commands`);
 };
 
 // Event handler
 client.once('ready', () => {
     console.log(`🤖 Bot ${client.user.tag} đã sẵn sàng!`);
     console.log(`📊 Đang phục vụ ${client.guilds.cache.size} servers`);
+    console.log(`🔄 Restart count: ${restartCount}`);
+    
+    // Reset restart count khi bot start thành công
+    restartCount = 0;
     
     // Thiết lập hoạt động với prefix động
     updateBotActivity();
     
     // Khởi động Reminder Scheduler
-    reminderScheduler.start();
+    try {
+        reminderScheduler = new ReminderScheduler(client);
+        reminderScheduler.start();
+    } catch (error) {
+        console.error('❌ Lỗi khởi động Reminder Scheduler:', error);
+    }
+});
+
+// Error event handlers
+client.on('error', (error) => {
+    console.error('❌ Discord client error:', error);
+});
+
+client.on('warn', (warning) => {
+    console.warn('⚠️ Discord client warning:', warning);
+});
+
+client.on('disconnect', () => {
+    console.log('🔌 Bot disconnected from Discord');
+});
+
+client.on('reconnecting', () => {
+    console.log('🔄 Bot is reconnecting...');
+});
+
+client.on('resume', () => {
+    console.log('▶️ Bot resumed connection');
 });
 
 client.on('messageCreate', async (message) => {
@@ -679,11 +751,14 @@ const setupCronJobs = () => {
     console.log('⏰ Đã thiết lập các cron jobs');
 };
 
-// Khởi động bot
+// Khởi động bot với auto-restart
 const startBot = async () => {
     try {
+        console.log(`🚀 Đang khởi động bot (lần thử ${restartCount + 1})...`);
+        
         // Kết nối database
         await connectDB(config.mongoUri);
+        console.log('✅ Đã kết nối database');
         
         // Load commands
         loadCommands();
@@ -692,17 +767,80 @@ const startBot = async () => {
         setupCronJobs();
         
         // Load giveaway đang hoạt động
-        const giveawayHandler = require('./commands/general/giveaway.js');
-        if (giveawayHandler.loadActiveGiveaways) {
-            await giveawayHandler.loadActiveGiveaways(client);
+        try {
+            const giveawayHandler = require('./commands/general/giveaway.js');
+            if (giveawayHandler.loadActiveGiveaways) {
+                await giveawayHandler.loadActiveGiveaways(client);
+            }
+        } catch (error) {
+            console.error('⚠️ Lỗi load giveaways:', error.message);
         }
         
         // Đăng nhập bot
         await client.login(config.token);
+        console.log('✅ Bot đã đăng nhập thành công');
+        
     } catch (error) {
         console.error('❌ Lỗi khởi động bot:', error);
-        process.exit(1);
+        
+        // Auto-restart logic thay vì process.exit
+        restartCount++;
+        
+        if (restartCount < MAX_RESTARTS) {
+            console.log(`🔄 Thử khởi động lại sau 10 giây... (${restartCount}/${MAX_RESTARTS})`);
+            
+            // Cleanup trước khi restart
+            try {
+                if (client && client.isReady()) {
+                    client.destroy();
+                }
+            } catch (cleanupError) {
+                console.error('Lỗi cleanup:', cleanupError);
+            }
+            
+            // Restart sau 10 giây
+            setTimeout(() => {
+                startBot();
+            }, 10000);
+        } else {
+            console.error(`❌ Đã thử khởi động ${MAX_RESTARTS} lần, dừng bot để tránh loop vô tận`);
+            console.error('🔧 Vui lòng kiểm tra cấu hình và khởi động lại thủ công');
+            process.exit(1);
+        }
     }
 };
 
+// Auto-restart nếu bot bị disconnect quá lâu
+let disconnectTimeout;
+
+client.on('disconnect', () => {
+    console.log('🔌 Bot bị disconnect, đợi 30 giây để thử reconnect...');
+    
+    disconnectTimeout = setTimeout(() => {
+        console.log('⚠️ Bot không thể reconnect, thử restart...');
+        restartCount++;
+        
+        if (restartCount < MAX_RESTARTS) {
+            try {
+                client.destroy();
+            } catch (error) {
+                console.error('Lỗi destroy client:', error);
+            }
+            
+            setTimeout(() => {
+                startBot();
+            }, 5000);
+        }
+    }, 30000);
+});
+
+client.on('ready', () => {
+    // Clear disconnect timeout khi reconnect thành công
+    if (disconnectTimeout) {
+        clearTimeout(disconnectTimeout);
+        disconnectTimeout = null;
+    }
+});
+
+// Khởi động bot lần đầu
 startBot(); 
