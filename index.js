@@ -116,23 +116,10 @@ client.on('messageCreate', async (message) => {
             
             const cityUser = await getCityUser(message.author.id);
             
-            // Debug log
-            if (cityUser.job === 'nhabao') {
-                console.log(`🔍 Debug Nhà báo ${message.author.displayName}:`, {
-                    hasJob: !!cityUser.job,
-                    job: cityUser.job,
-                    hasWorkStartTime: !!cityUser.workStartTime,
-                    workProgress: cityUser.workProgress || 0,
-                    lastWork: cityUser.lastWork
-                });
-            }
-            
             // Kiểm tra xem user có nghề chat và đang trong ca làm việc không
             if (cityUser.job && ['nhabao', 'mc'].includes(cityUser.job) && cityUser.workStartTime) {
                 const job = JOB_TYPES[cityUser.job];
                 const currentProgress = cityUser.workProgress || 0;
-                
-                console.log(`✅ Processing chat for ${message.author.displayName}: ${currentProgress + 1}/${job.targetMessages}`);
                 
                 // Kiểm tra xem đã hoàn thành chưa
                 if (currentProgress < job.targetMessages) {

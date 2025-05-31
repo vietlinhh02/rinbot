@@ -398,19 +398,20 @@ module.exports = {
             });
         }
         
-        const resetProgress = isNewDay ? 0 : currentProgress;
+        // Hiển thị tiến độ thực tế hiện tại (không reset về 0)
+        const displayProgress = currentProgress;
         const workTimeMinutes = isWorking ? Math.floor((now - new Date(cityUser.workStartTime)) / 60000) : 0;
         
         const embed = new EmbedBuilder()
             .setTitle('📰 NGHỀ NHÀ BÁO - THỐNG KÊ CHI TIẾT')
             .setDescription(`**📊 Trạng thái công việc:**\n` +
                 `• **Nghề nghiệp:** ${job.name}\n` +
-                `• **Tin nhắn đã chat:** ${resetProgress}/${job.targetMessages}\n` +
-                `• **Tiến độ:** ${Math.round((resetProgress / job.targetMessages) * 100)}%\n` +
-                `• **Còn thiếu:** ${Math.max(0, job.targetMessages - resetProgress)} tin nhắn\n\n` +
+                `• **Tin nhắn đã chat:** ${displayProgress}/${job.targetMessages}\n` +
+                `• **Tiến độ:** ${Math.round((displayProgress / job.targetMessages) * 100)}%\n` +
+                `• **Còn thiếu:** ${Math.max(0, job.targetMessages - displayProgress)} tin nhắn\n\n` +
                 `**💰 Thu nhập:**\n` +
                 `• **Thưởng/tin nhắn:** ${job.rewardPerMessage} Rin\n` +
-                `• **Đã kiếm được:** ${(resetProgress * job.rewardPerMessage).toLocaleString()} Rin\n` +
+                `• **Đã kiếm được:** ${(displayProgress * job.rewardPerMessage).toLocaleString()} Rin\n` +
                 `• **Tổng khi hoàn thành:** ${(job.targetMessages * job.rewardPerMessage).toLocaleString()} Rin\n\n` +
                 `**⏰ Thời gian:**\n` +
                 `• **Trạng thái ca làm:** ${isWorking ? '🟢 Đang làm việc' : '🚀 Bắt đầu ca mới'}\n` +
