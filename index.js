@@ -116,10 +116,23 @@ client.on('messageCreate', async (message) => {
             
             const cityUser = await getCityUser(message.author.id);
             
+            // Debug log
+            if (cityUser.job === 'nhabao') {
+                console.log(`🔍 Debug Nhà báo ${message.author.displayName}:`, {
+                    hasJob: !!cityUser.job,
+                    job: cityUser.job,
+                    hasWorkStartTime: !!cityUser.workStartTime,
+                    workProgress: cityUser.workProgress || 0,
+                    lastWork: cityUser.lastWork
+                });
+            }
+            
             // Kiểm tra xem user có nghề chat và đang trong ca làm việc không
             if (cityUser.job && ['nhabao', 'mc'].includes(cityUser.job) && cityUser.workStartTime) {
                 const job = JOB_TYPES[cityUser.job];
                 const currentProgress = cityUser.workProgress || 0;
+                
+                console.log(`✅ Processing chat for ${message.author.displayName}: ${currentProgress + 1}/${job.targetMessages}`);
                 
                 // Kiểm tra xem đã hoàn thành chưa
                 if (currentProgress < job.targetMessages) {
@@ -133,10 +146,33 @@ client.on('messageCreate', async (message) => {
                         workProgress: newProgress 
                     });
                     
+                    // Thông báo tiến độ mỗi 10 tin nhắn hoặc khi gần hoàn thành
+                    const shouldNotify = newProgress % 10 === 0 || newProgress >= job.targetMessages - 5;
+                    
+                    if (shouldNotify && newProgress < job.targetMessages) {
+                        const remaining = job.targetMessages - newProgress;
+                        const progressPercent = Math.round((newProgress / job.targetMessages) * 100);
+                        
+                        // Thêm reaction để báo tiến độ
+                        if (remaining <= 5) {
+                            await message.react('🔥'); // Gần hoàn thành
+                        } else if (newProgress % 10 === 0) {
+                            await message.react('📈'); // Milestone
+                        }
+                        
+                        // Thông báo nhẹ
+                        setTimeout(async () => {
+                            const msg = await message.reply(`📊 **Nhà báo:** ${newProgress}/${job.targetMessages} tin nhắn (${progressPercent}%) - Còn ${remaining} tin nhắn nữa! 💪`);
+                            setTimeout(() => msg.delete().catch(() => {}), 5000); // Xóa sau 5s
+                        }, 1000);
+                    }
+                    
                     // Thông báo khi hoàn thành
                     if (newProgress >= job.targetMessages) {
                         const { EmbedBuilder } = require('discord.js');
                         const { COLORS } = require('./utils/constants');
+                        
+                        await message.react('🎉'); // Hoàn thành
                         
                         const embed = new EmbedBuilder()
                             .setTitle('🎉 HOÀN THÀNH CA LÀM VIỆC!')
@@ -460,13 +496,70 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // Lưu thời điểm join voice vào DB cho nghề MC
 client.on('voiceStateUpdate', async (oldState, newState) => {
     try {
-        // Chỉ xử lý khi user join voice channel
+        const { getCityUser, updateCityUser, updateUserRin } = require('./utils/database');
+        const { JOB_TYPES, COLORS } = require('./utils/constants');
+        const { EmbedBuilder } = require('discord.js');
+        
+        // User join voice channel
         if (!oldState.channelId && newState.channelId) {
             const userId = newState.id;
-            const { getCityUser, updateCityUser } = require('./utils/database');
             const cityUser = await getCityUser(userId);
             if (cityUser && cityUser.job === 'mc') {
                 await updateCityUser(userId, { lastVoiceJoin: new Date() });
+                console.log(`🎤 MC ${newState.member.displayName} đã vào voice`);
+            }
+        }
+        
+        // User leave voice channel - tính thời gian và update tiến độ
+        if (oldState.channelId && !newState.channelId) {
+            const userId = oldState.id;
+            const cityUser = await getCityUser(userId);
+            if (cityUser && cityUser.job === 'mc' && cityUser.lastVoiceJoin) {
+                const job = JOB_TYPES.mc;
+                const now = new Date();
+                const lastJoin = new Date(cityUser.lastVoiceJoin);
+                const sessionMinutes = Math.floor((now - lastJoin) / 60000);
+                const dailyProgress = cityUser.dailyVoiceMinutes || 0;
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const isNewDay = !cityUser.lastWork || new Date(cityUser.lastWork) < todayStart;
+                
+                // Reset nếu là ngày mới
+                const currentDaily = isNewDay ? sessionMinutes : dailyProgress + sessionMinutes;
+                
+                console.log(`🎤 MC ${oldState.member.displayName} rời voice: ${sessionMinutes} phút, tổng: ${currentDaily} phút`);
+                
+                if (currentDaily >= job.minVoiceMinutes && (isNewDay || dailyProgress < job.minVoiceMinutes)) {
+                    // Hoàn thành công việc
+                    await updateUserRin(userId, job.rewardPerDay);
+                    await updateCityUser(userId, { 
+                        lastWork: now,
+                        lastVoiceJoin: null,
+                        dailyVoiceMinutes: 0
+                    });
+                    
+                    const embed = new EmbedBuilder()
+                        .setTitle('🎉 MC - HOÀN THÀNH CÔNG VIỆC!')
+                        .setDescription(`**✅ Chúc mừng ${oldState.member.displayName}! Bạn đã hoàn thành ca làm MC!**\n\n` +
+                            `• **Thời gian voice hôm nay:** ${currentDaily} phút\n` +
+                            `• **Yêu cầu:** ${job.minVoiceMinutes} phút\n` +
+                            `• **Thưởng nhận được:** ${job.rewardPerDay} Rin\n\n` +
+                            `**⏰ Cooldown:** ${Math.floor(job.cooldown / (60 * 60 * 1000))} giờ\n` +
+                            `Hãy nghỉ ngơi và quay lại sau!`)
+                        .setColor(COLORS.success);
+                    
+                    // Gửi thông báo đến channel mà user đang ở
+                    const channels = oldState.guild.channels.cache.filter(c => c.type === 0);
+                    const targetChannel = channels.find(c => c.name.includes('chat') || c.name.includes('general')) || channels.first();
+                    if (targetChannel) {
+                        await targetChannel.send({ embeds: [embed] });
+                    }
+                } else {
+                    // Chỉ cập nhật tiến độ
+                    await updateCityUser(userId, {
+                        lastVoiceJoin: null,
+                        dailyVoiceMinutes: currentDaily
+                    });
+                }
             }
         }
     } catch (err) {
@@ -476,6 +569,74 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
 // Cron jobs
 const setupCronJobs = () => {
+    // Update tiến độ MC mỗi phút cho user đang ở voice
+    cron.schedule('* * * * *', async () => {
+        try {
+            const { getCityUser, updateCityUser, updateUserRin } = require('./utils/database');
+            const { JOB_TYPES, COLORS } = require('./utils/constants');
+            const { EmbedBuilder } = require('discord.js');
+            
+            for (const guild of client.guilds.cache.values()) {
+                for (const voiceChannel of guild.channels.cache.filter(c => c.type === 2).values()) {
+                    for (const member of voiceChannel.members.values()) {
+                        if (member.user.bot) continue;
+                        
+                        const cityUser = await getCityUser(member.id);
+                        if (cityUser && cityUser.job === 'mc' && cityUser.lastVoiceJoin) {
+                            const job = JOB_TYPES.mc;
+                            const now = new Date();
+                            const lastJoin = new Date(cityUser.lastVoiceJoin);
+                            const sessionMinutes = Math.floor((now - lastJoin) / 60000);
+                            const dailyProgress = cityUser.dailyVoiceMinutes || 0;
+                            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            const isNewDay = !cityUser.lastWork || new Date(cityUser.lastWork) < todayStart;
+                            
+                            // Reset nếu là ngày mới
+                            const currentDaily = isNewDay ? sessionMinutes : dailyProgress + sessionMinutes;
+                            
+                            // Kiểm tra nếu đủ điều kiện hoàn thành và chưa hoàn thành hôm nay
+                            if (currentDaily >= job.minVoiceMinutes && (isNewDay || dailyProgress < job.minVoiceMinutes)) {
+                                // Hoàn thành công việc
+                                await updateUserRin(member.id, job.rewardPerDay);
+                                await updateCityUser(member.id, { 
+                                    lastWork: now,
+                                    lastVoiceJoin: null,
+                                    dailyVoiceMinutes: 0
+                                });
+                                
+                                const embed = new EmbedBuilder()
+                                    .setTitle('🎉 MC - HOÀN THÀNH CÔNG VIỆC!')
+                                    .setDescription(`**✅ Chúc mừng ${member.displayName}! Bạn đã hoàn thành ca làm MC!**\n\n` +
+                                        `• **Thời gian voice hôm nay:** ${currentDaily} phút\n` +
+                                        `• **Yêu cầu:** ${job.minVoiceMinutes} phút\n` +
+                                        `• **Thưởng nhận được:** ${job.rewardPerDay} Rin\n\n` +
+                                        `**⏰ Cooldown:** ${Math.floor(job.cooldown / (60 * 60 * 1000))} giờ\n` +
+                                        `Hãy nghỉ ngơi và quay lại sau!`)
+                                    .setColor(COLORS.success);
+                                
+                                // Gửi thông báo đến channel chính
+                                const channels = guild.channels.cache.filter(c => c.type === 0);
+                                const targetChannel = channels.find(c => c.name.includes('chat') || c.name.includes('general')) || channels.first();
+                                if (targetChannel) {
+                                    await targetChannel.send({ embeds: [embed] });
+                                }
+                                console.log(`🎉 MC ${member.displayName} đã hoàn thành ca làm tự động!`);
+                            } else if (sessionMinutes > 0) {
+                                // Cập nhật tiến độ
+                                await updateCityUser(member.id, {
+                                    dailyVoiceMinutes: currentDaily
+                                });
+                                console.log(`⏱️ Update MC ${member.displayName}: ${currentDaily}/${job.minVoiceMinutes} phút`);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Lỗi update tiến độ MC:', error);
+        }
+    });
+
     // Kiểm tra giveaway mỗi 10 giây
     cron.schedule('*/10 * * * * *', async () => {
         try {
