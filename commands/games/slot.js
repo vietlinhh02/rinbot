@@ -75,8 +75,8 @@ module.exports = {
             }
         });
 
-        let slotResultKeys = []; // Sẽ chứa 3 keys, ví dụ: ['common', 'common', 'common'] hoặc ['rare', 'epic', 'common']
-        const houseAdvantageWins = Math.random() < 0.20; // 20% tỷ lệ nhà cái thắng (người chơi thua)
+        let slotResultKeys = []; 
+        const houseAdvantageWins = Math.random() < 0.40; 
 
         if (houseAdvantageWins) {
             // NHÀ CÁI THẮNG (NGƯỜI CHƠI THUA): Tạo 3 slot khác nhau
@@ -129,7 +129,7 @@ module.exports = {
             .setFooter({ text: 'Đang khởi động...' });
         const sentMsg = await message.reply({ embeds: [initialEmbed] });
 
-        const updateDelay = 250; // Thời gian chờ giữa các frame (ms), tăng nếu animation giật
+        const updateDelay = 300; // Thời gian chờ giữa các frame (ms), tăng nếu animation giật
         const initialSpinFrames = 5; // Số frame cho lần quay đầu
         const secondSpinFrames = 4;  // Số frame cho lần quay thứ hai
         const thirdSpinFrames = 3;   // Số frame cho lần quay cuối
