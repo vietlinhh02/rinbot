@@ -107,8 +107,8 @@ module.exports = {
                     `• **Giới hạn:** Mỗi nhà chỉ trộm được 1 lần/ngày\n` +
                     `• **Thu nhập:** 100-500 Rin ngẫu nhiên\n\n` +
                     `🌱 **TRỘM CÂY TRONG FARM:**\n` +
-                    `• **Điều kiện:** Cây đã trồng (không phải hạt giống)\n` +
-                    `• **Thời gian:** Luôn có thể (nếu có cây phù hợp)\n` +
+                    `• **Điều kiện:** Cây đã trưởng thành và có thể thu hoạch\n` +
+                    `• **Thời gian:** Từ khi cây có thể thu hoạch đến 3 tiếng (chưa chết)\n` +
                     `• **Thu nhập:** 30-70% giá trị cây\n` +
                     `• **Rủi ro:** Có thể bị công an bắt trong 10 phút\n\n` +
                     `**⚠️ LƯU Ý QUAN TRỌNG:**\n` +
@@ -154,7 +154,7 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setTitle('🎯 DANH SÁCH MỤC TIÊU TRỘM')
             .setDescription(`**Danh sách những người có thể trộm:**\n\n` +
-                `🌱 **Trộm cây:** Luôn có thể (nếu có cây phù hợp)\n` +
+                `🌱 **Trộm cây:** Cây đã trưởng thành và có thể thu hoạch\n` +
                 `🏠 **Trộm tiền:** ${canStealMoney ? '✅ Hiện tại có thể (19h-21h)' : '❌ Ngoài giờ (19h-21h)'}\n\n` +
                 `⏰ **Cooldown:** 2 phút/lần trộm\n` +
                 `⚠️ **Nguy cơ:** Có thể bị công an bắt\n` +
@@ -188,11 +188,11 @@ module.exports = {
                 guildId: message.guild.id // Chỉ tìm cây trong server hiện tại
             });
             const stealableTrees = targetTrees.filter(tree => {
-                if (!tree.maturedAt) return false;
+                if (!tree.maturedAt) return false; // Cây phải đã trưởng thành
                 const matured = new Date(tree.maturedAt);
                 const minutesSinceMature = (new Date() - matured) / (1000 * 60);
-                if (minutesSinceMature < 80) return false; // Chưa đủ 1h20p
-                if (minutesSinceMature > 180) return false; // Đã chết
+                if (minutesSinceMature < 60) return false; // Phải chờ ít nhất 1 tiếng sau khi mature (có thể thu hoạch)
+                if (minutesSinceMature > 180) return false; // Đã chết sau 3 tiếng
                 return true;
             });
 
@@ -235,9 +235,9 @@ module.exports = {
                 // Trộm cây
                 stealType = 'tree';
                 const randomTree = stealableTrees[Math.floor(Math.random() * stealableTrees.length)];
-                const treeValue = TREE_VALUES[randomTree.type] || 100;
+                const treeValue = TREE_VALUES[randomTree.species] || 100;
                 stolenAmount = Math.floor(treeValue * (0.3 + Math.random() * 0.4)); // 30-70% giá trị
-                description = `cây ${randomTree.type} từ farm ${targetUser.displayName}`;
+                description = `cây ${randomTree.species} từ farm ${targetUser.displayName}`;
 
                 // Xóa cây khỏi farm
                 await Tree.deleteOne({ _id: randomTree._id });

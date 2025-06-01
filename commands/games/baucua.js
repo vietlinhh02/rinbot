@@ -262,6 +262,8 @@ module.exports = {
 
             let resultText = '';
 
+            let hostNetWinnings = 0; // Tổng tiền nhà cái thắng/thua
+
             // Xử lý từng người chơi
             for (const [userId, userBets] of game.bets) {
                 const user = await interaction.client.users.fetch(userId);
@@ -277,31 +279,40 @@ module.exports = {
                         multiplier = 1;
                         winAmount = amount * multiplier;
                         totalWin += winAmount;
+                        hostNetWinnings -= winAmount; // Nhà cái mất tiền khi người chơi thắng
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: +${winAmount} Rin (x${multiplier})`);
                     } else if (count === 2) {
                         multiplier = 2;
                         winAmount = amount * multiplier;
                         totalWin += winAmount;
+                        hostNetWinnings -= winAmount; // Nhà cái mất tiền khi người chơi thắng
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: +${winAmount} Rin (x${multiplier})`);
                     } else if (count === 3) {
                         multiplier = 4;
                         winAmount = amount * multiplier;
                         totalWin += winAmount;
+                        hostNetWinnings -= winAmount; // Nhà cái mất tiền khi người chơi thắng
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: +${winAmount} Rin (x${multiplier})`);
                     } else {
                         totalLoss += amount;
+                        hostNetWinnings += amount; // Nhà cái nhận tiền khi người chơi thua
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: -${amount} Rin`);
-                        await updateUserRin(game.host.id, amount);
                     }
                 }
 
-                const netResult = totalWin - totalLoss;
-                if (netResult > 0) {
-                    await updateUserRin(userId, netResult);
+                // Cộng tiền thắng cho người chơi (lấy lại tiền cược + tiền thắng)
+                if (totalWin > 0) {
+                    await updateUserRin(userId, totalWin);
                 }
 
+                const netResult = totalWin - totalLoss;
                 resultText += `\n**${user.displayName}**: ${netResult >= 0 ? '+' : ''}${netResult} Rin\n`;
                 resultText += betResults.join('\n') + '\n';
+            }
+
+            // Cập nhật tiền cho nhà cái
+            if (hostNetWinnings !== 0) {
+                await updateUserRin(game.host.id, hostNetWinnings);
             }
 
             resultEmbed.setDescription(resultEmbed.data.description + '\n\n' + resultText);

@@ -11,7 +11,7 @@ module.exports = {
         const userId = message.author.id;
         
         // Kiểm tra số cây hiện có (giới hạn 1 cây)
-        const existingTrees = await Tree.find({ userId });
+        const existingTrees = await Tree.find({ userId, guildId: message.guild.id });
         const maxTrees = 1;
         if (existingTrees.length >= maxTrees) {
             let treeList = '';
@@ -39,7 +39,8 @@ module.exports = {
 
     async plantTree(messageOrInteraction, treeType, userId, isInteraction = false) {
         // Kiểm tra giới hạn số cây
-        const existingTrees = await Tree.find({ userId });
+        const guildId = isInteraction ? messageOrInteraction.guild.id : messageOrInteraction.guild.id;
+        const existingTrees = await Tree.find({ userId, guildId });
         const maxTrees = 1;
         
         if (existingTrees.length >= maxTrees) {
@@ -67,6 +68,7 @@ module.exports = {
         
         const newTree = new Tree({
             userId,
+            guildId,
             species: treeType,
             age: 0,
             waterCount: 0,
@@ -78,7 +80,7 @@ module.exports = {
         await newTree.save();
 
         // Đếm lại số cây sau khi trồng
-        const updatedTrees = await Tree.find({ userId });
+        const updatedTrees = await Tree.find({ userId, guildId });
 
         const embed = new EmbedBuilder()
             .setTitle('🌱 TRỒNG CÂY THÀNH CÔNG!')

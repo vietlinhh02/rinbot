@@ -16,7 +16,7 @@ module.exports = {
                 .setDescription('**🤖 Chào mừng đến với RinBot!** 🎉\n\n' +
                     'RinBot là bot đa năng với nhiều tính năng vui nhộn!\n\n' +
                     '**📚 Danh mục hướng dẫn:**\n' +
-                    `• \`${prefix}rinhelp basic\` - 💰 Lệnh cơ bản (Rin, daily, shop)\n` +
+                    `• \`${prefix}rinhelp basic\` - 💰 Lệnh cơ bản (Rin, shop, marriage, AI)\n` +
                     `• \`${prefix}rinhelp farm\` - 🌱 Hệ thống Farm (trồng cây)\n` +
                     `• \`${prefix}rinhelp pet\` - 🐾 Hệ thống Pet (nuôi thú cưng)\n` +
                     `• \`${prefix}rinhelp city\` - 🏙️ Hệ thống City (thuê nhà, nghề nghiệp)\n` +
@@ -41,20 +41,30 @@ module.exports = {
                 .addFields(
                     { 
                         name: '💳 Quản lý Rin', 
-                        value: `• \`${prefix}rin\` - Xem số Rin hiện tại\n` +
-                               `• \`${prefix}daily\` - Nhận 200 Rin mỗi ngày\n` +
-                               `• \`${prefix}work\` - Làm việc kiếm 50-150 Rin (4h/lần)\n` +
-                               `• \`${prefix}top\` - Xem top người giàu\n` +
-                               `• \`${prefix}chuyenrin @user 100\` - Chuyển Rin`, 
+                        value: `• \`${prefix}rincheck\` - Xem số Rin hiện tại\n` +
+                               `• \`${prefix}rindaily\` - Nhận 200 Rin mỗi ngày\n` +
+                               `• \`${prefix}lamviec\` - Làm việc kiếm 50-150 Rin (4h/lần)\n` +
+                               `• \`${prefix}top\` - Xem top người giàu (${prefix}top help)\n` +
+                               `• \`${prefix}grin @user 100\` - Chuyển Rin`, 
                         inline: false 
                     },
                     { 
-                        name: '🏪 Cửa hàng', 
+                        name: '🏪 Cửa hàng & Inventory', 
                         value: `• \`${prefix}shop\` - Xem cửa hàng\n` +
-                               `• \`${prefix}buy thuoc\` - Mua thuốc (100 Rin)\n` +
-                               `• \`${prefix}buy balo\` - Mua balo (500 Rin)\n` +
-                               `• \`${prefix}use thuoc @user\` - Dùng thuốc\n` +
-                               `• \`${prefix}inventory\` - Xem túi đồ`, 
+                               `• \`${prefix}inventory\` - Xem túi đồ\n` +
+                               `• \`${prefix}buy thuoc 5\` - Mua thuốc (100 Rin/cái)\n` +
+                               `• \`${prefix}buy balo\` - Mua balo (500 Rin, +5 slots)\n` +
+                               `• \`${prefix}use thuoc @user\` - Dùng thuốc chữa pet`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '💒 Hệ thống Marriage', 
+                        value: `• \`${prefix}buy nhankim\` - Mua nhẫn kim (1,000 Rin)\n` +
+                               `• \`${prefix}buy nhanbac\` - Mua nhẫn bạc (3,000 Rin)\n` +
+                               `• \`${prefix}buy nhanvang\` - Mua nhẫn vàng (10,000 Rin)\n` +
+                               `• \`${prefix}marry @user nhankim\` - Cầu hôn với nhẫn\n` +
+                               `• \`${prefix}marriage\` - Xem thông tin hôn nhân\n` +
+                               `• \`${prefix}divorce\` - Ly hôn (hoàn 30% giá nhẫn)`, 
                         inline: false 
                     },
                     { 
@@ -80,6 +90,18 @@ module.exports = {
                                `• \`${prefix}xemnhacnho\` - Xem danh sách nhắc nhở\n` +
                                `• \`${prefix}huynhacnho 1\` - Hủy nhắc nhở số 1\n` +
                                `• **Gửi DM:** Bot sẽ gửi tin nhắn riêng khi tới giờ`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '🔮 AI Bói & Tư vấn', 
+                        value: `• \`${prefix}setgemini\` - Cài đặt Gemini API Key (miễn phí)\n` +
+                               `• \`${prefix}boi\` - Xem bói AI ngẫu nhiên\n` +
+                               `• \`${prefix}boi tarot\` - Bói bài Tarot\n` +
+                               `• \`${prefix}boi tuongso\` - Tướng số\n` +
+                               `• \`${prefix}boi sao\` - Bói sao\n` +
+                               `• \`${prefix}hoi\` - Hỏi chuyên gia tư vấn ẩn danh\n` +
+                               `• **8 chủ đề:** Tổng quát, Tình yêu, Sự nghiệp, Sức khỏe, Tài chính, Gia đình, Học tập, Cuộc sống\n` +
+                               `• **Hoàn toàn ẩn danh:** Chuyên gia và người hỏi không biết nhau`, 
                         inline: false 
                     }
                 )

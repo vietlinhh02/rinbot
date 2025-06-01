@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const treeSchema = new mongoose.Schema({
     userId: { type: String, required: true },
+    guildId: { type: String, required: true }, // Để phân biệt server
     species: String,
     age: { type: Number, default: 0 },
     waterCount: { type: Number, default: 0 },

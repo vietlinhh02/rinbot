@@ -10,8 +10,8 @@ module.exports = {
     async execute(message, args) {
         const userId = message.author.id;
         
-        // Tìm tất cả cây của người chơi
-        const trees = await Tree.find({ userId }).sort({ plantedAt: 1 });
+        // Tìm tất cả cây của người chơi trong server này
+        const trees = await Tree.find({ userId, guildId: message.guild.id }).sort({ plantedAt: 1 });
         if (trees.length === 0) {
             return message.reply('❌ Bạn chưa có cây nào! Hãy dùng lệnh `muacay` để trồng cây.');
         }

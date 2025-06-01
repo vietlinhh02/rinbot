@@ -8,7 +8,7 @@ module.exports = {
         try {
             if (args.length === 0) {
                 const embed = new EmbedBuilder()
-                    .setTitle('🔮 QUAÛ CAàU PHA LEA')
+                    .setTitle('🔮 Quả Cầu Pha Lê')
                     .setDescription('**Cách sử dụng:**\n' +
                         '`,8ball <câu hỏi>`\n\n' +
                         '**Ví dụ:**\n' +

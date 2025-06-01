@@ -5,6 +5,7 @@ const config = require('./config/config.js');
 const { connectDB, getGuildPrefix, getAllGuildPrefixes } = require('./utils/database.js');
 const cron = require('node-cron');
 const ReminderScheduler = require('./utils/reminderScheduler');
+const marriageTracker = require('./utils/marriageTracker');
 
 // Auto-restart counter
 let restartCount = 0;
@@ -18,7 +19,8 @@ const client = new Client({
         GatewayIntentBits.MessageContent, 
         GatewayIntentBits.GuildMembers,    
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildVoiceStates
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.DirectMessages // Thêm intent cho DM
     ]
 });
 
@@ -163,7 +165,43 @@ client.on('resume', () => {
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
-    if (!message.guild) return; // Không xử lý DM
+    
+    // Xử lý DM từ chuyên gia
+    if (!message.guild) {
+        try {
+            const ExpertHandler = require('./utils/expertHandler');
+            const expertHandler = new ExpertHandler(client);
+            
+            // Kiểm tra nếu message từ chuyên gia
+            const handled = await expertHandler.handleExpertDM(message);
+            if (handled) return;
+            
+            // Nếu không phải chuyên gia, gửi hướng dẫn chung
+            if (message.content.toLowerCase() === 'status') {
+                await expertHandler.checkExpertStatus(message);
+                return;
+            }
+            
+            // Hướng dẫn chung cho DM
+            const helpEmbed = require('discord.js').EmbedBuilder;
+            const dmHelpEmbed = new helpEmbed()
+                .setTitle('📩 Tin nhắn riêng')
+                .setDescription('**Bạn có thể:**\n\n' +
+                    '👨‍⚕️ **Nếu bạn là chuyên gia:**\n' +
+                    '• Trả lời câu hỏi: `!reply [mã] [câu trả lời]`\n' +
+                    '• Xem thông tin: `status`\n\n' +
+                    '❓ **Hỏi chuyên gia:**\n' +
+                    '• Vào server và gõ `[prefix]hoi` để hỏi chuyên gia\n\n' +
+                    '🔒 **Hoàn toàn ẩn danh và bảo mật**')
+                .setColor('#0099FF');
+            
+            await message.reply({ embeds: [dmHelpEmbed] });
+            
+        } catch (error) {
+            console.error('Lỗi xử lý DM:', error);
+        }
+        return;
+    }
 
     // Lấy prefix theo thứ tự ưu tiên: database > .env > default
     let guildPrefix;
@@ -271,6 +309,13 @@ client.on('messageCreate', async (message) => {
         }
     }
 
+    // Xử lý marriage tracking cho chat
+    try {
+        await marriageTracker.handleChatExp(message);
+    } catch (error) {
+        console.error('Lỗi marriage chat tracking:', error);
+    }
+
     if (!message.content.startsWith(guildPrefix)) return;
 
     const args = message.content.slice(guildPrefix.length).trim().split(/ +/);
@@ -319,6 +364,30 @@ client.on('interactionCreate', async (interaction) => {
                 }
                 return;
             }
+        }
+
+        // Xử lý interactions cho setgemini
+        if (interaction.customId && (
+            interaction.customId === 'open_apikey_modal' ||
+            interaction.customId === 'apikey_modal'
+        )) {
+            const setgeminiCommand = client.commands.get('setgemini');
+            if (setgeminiCommand && setgeminiCommand.handleInteraction) {
+                await setgeminiCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
+        // Xử lý interactions cho hỏi chuyên gia
+        if (interaction.customId && (
+            interaction.customId.startsWith('ask_expert_') ||
+            interaction.customId.startsWith('question_modal_')
+        )) {
+            const hoiCommand = client.commands.get('hoi');
+            if (hoiCommand && hoiCommand.handleInteraction) {
+                await hoiCommand.handleInteraction(interaction);
+            }
+            return;
         }
 
         // Xử lý interactions cho Bầu Cua (người dùng làm nhà cái)
@@ -527,6 +596,28 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
+        // Xử lý interactions cho Marriage system
+        if (interaction.customId && (
+            interaction.customId.startsWith('buy_') ||
+            interaction.customId.startsWith('marry_') ||
+            interaction.customId.startsWith('divorce_')
+        )) {
+            let marriageCommand = null;
+            
+            if (interaction.customId.startsWith('buy_')) {
+                marriageCommand = client.commands.get('buy');
+            } else if (interaction.customId.startsWith('marry_')) {
+                marriageCommand = client.commands.get('marry');
+            } else if (interaction.customId.startsWith('divorce_')) {
+                marriageCommand = client.commands.get('divorce');
+            }
+            
+            if (marriageCommand && marriageCommand.handleInteraction) {
+                await marriageCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
     } catch (error) {
         console.error('Lỗi interaction:', error);
         if (!interaction.replied && !interaction.deferred) {
@@ -565,6 +656,13 @@ client.on('messageReactionRemove', async (reaction, user) => {
 
 // Lưu thời điểm join voice vào DB cho nghề MC
 client.on('voiceStateUpdate', async (oldState, newState) => {
+    // Xử lý marriage tracking cho voice trước
+    try {
+        await marriageTracker.handleVoiceUpdate(oldState, newState);
+    } catch (error) {
+        console.error('Lỗi marriage voice tracking:', error);
+    }
+    
     try {
         const { getCityUser, updateCityUser, updateUserRin } = require('./utils/database');
         const { JOB_TYPES, COLORS } = require('./utils/constants');

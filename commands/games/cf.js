@@ -21,7 +21,7 @@ module.exports = {
             .setColor('#AAAAAA');
         const sentMsg = await message.reply({ embeds: [animEmbed] });
         setTimeout(async () => {
-            const result = Math.random() < 0.35 ? 'win' : 'lose';
+            const result = Math.random() < 0.45 ? 'win' : 'lose';
             let desc = '';
             if (result === 'win') {
                 await updateUserRin(userId, amount);

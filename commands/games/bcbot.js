@@ -290,6 +290,8 @@ module.exports = {
 
         let resultText = `🎲 **Kết quả:** ${results.map(r => `${BAU_CUA_EMOJIS[r]} ${r}`).join(' | ')}\n\n`;
 
+        let botNetWinnings = 0; // Tổng tiền bot thắng/thua
+
         // Xử lý từng người chơi
         for (const [userId, userBets] of game.bets) {
             const user = await channel.client.users.fetch(userId);
@@ -305,32 +307,40 @@ module.exports = {
                     multiplier = 1;
                     winAmount = amount * multiplier;
                     totalWin += winAmount;
+                    botNetWinnings -= winAmount; // Bot mất tiền khi người chơi thắng
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} +${winAmount}`);
                 } else if (count === 2) {
                     multiplier = 2;
                     winAmount = amount * multiplier;
                     totalWin += winAmount;
+                    botNetWinnings -= winAmount; // Bot mất tiền khi người chơi thắng
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} +${winAmount}`);
                 } else if (count === 3) {
                     multiplier = 4;
                     winAmount = amount * multiplier;
                     totalWin += winAmount;
+                    botNetWinnings -= winAmount; // Bot mất tiền khi người chơi thắng
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} +${winAmount}`);
                 } else {
                     totalLoss += amount;
+                    botNetWinnings += amount; // Bot nhận tiền khi người chơi thua
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} -${amount}`);
-                    // Cộng tiền cược thua cho bot
-                    await updateUserRin('bot', amount);
                 }
             }
 
-            const netResult = totalWin - totalLoss;
-            if (netResult > 0) {
-                await updateUserRin(userId, netResult);
+            // Cộng tiền thắng cho người chơi (lấy lại tiền cược + tiền thắng)
+            if (totalWin > 0) {
+                await updateUserRin(userId, totalWin);
             }
 
+            const netResult = totalWin - totalLoss;
             const resultIcon = netResult > 0 ? '🏆' : netResult === 0 ? '🤝' : '💸';
             resultText += `${resultIcon} **${user.displayName}:** ${netResult >= 0 ? '+' : ''}${netResult} (${betResults.join(' ')})\n`;
+        }
+
+        // Cập nhật tiền cho bot (nếu có thay đổi)
+        if (botNetWinnings !== 0) {
+            await updateUserRin('bot', botNetWinnings);
         }
 
         const resultEmbed = new EmbedBuilder()

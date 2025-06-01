@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { getUserRin, getGuildPrefix } = require('../../utils/database');
+const User = require('../../models/User');
 const os = require('os');
 
 module.exports = {
@@ -10,6 +11,20 @@ module.exports = {
             // Lấy thông tin cần thiết
             const userRin = await getUserRin(message.author.id);
             const guildPrefix = await getGuildPrefix(message.guild.id);
+            
+            // Lấy thông tin marriage
+            const user = await User.findOne({ userId: message.author.id });
+            let marriageInfo = 'Độc thân 💔';
+            if (user?.marriage?.isMarried) {
+                try {
+                    const partner = await client.users.fetch(user.marriage.partnerId);
+                    const ringEmoji = user.marriage.ringType === 'nhankim' ? '💍' : 
+                                     user.marriage.ringType === 'nhanbac' ? '💎' : '👑';
+                    marriageInfo = `${partner.displayName} ${ringEmoji} Lv.${user.marriage.ringLevel}`;
+                } catch {
+                    marriageInfo = 'Đã kết hôn 💕';
+                }
+            }
             
             // Thông tin bot
             const uptime = process.uptime();
@@ -26,7 +41,7 @@ module.exports = {
                 .addFields(
                     {
                         name: '👤 Thông tin cá nhân',
-                        value: `💰 **Rin của bạn:** ${userRin.toLocaleString()} Rin\n🏷️ **Tên:** ${message.author.displayName}\n🆔 **ID:** ${message.author.id}`,
+                        value: `💰 **Rin của bạn:** ${userRin.toLocaleString()} Rin\n🏷️ **Tên:** ${message.author.displayName}\n💒 **Tình trạng:** ${marriageInfo}\n🆔 **ID:** ${message.author.id}`,
                         inline: true
                     },
                     {
@@ -54,9 +69,29 @@ module.exports = {
                         value:
                             `💰 **Kiểm tra Rin** - \`${guildPrefix}rincheck\`\n` +
                             `🎁 **Nhận Rin hàng ngày** - \`${guildPrefix}rindaily\`\n` +
-                            `📚 **Hướng dẫn** - \`${guildPrefix}rinhelp\`\n` +
+                            `🏪 **Cửa hàng** - \`${guildPrefix}shop\`\n` +
+                            `📦 **Túi đồ** - \`${guildPrefix}inventory\`\n` +
+                            `📚 **Hướng dẫn** - \`${guildPrefix}rinhelp\``,
+                        inline: true
+                    },
+                    {
+                        name: '💒 Marriage & Shop',
+                        value:
+                            `💍 **Kết hôn** - \`${guildPrefix}marry @user [nhẫn]\`\n` +
+                            `💕 **Xem hôn nhân** - \`${guildPrefix}marriage\`\n` +
+                            `🛒 **Mua đồ** - \`${guildPrefix}buy [item]\`\n` +
                             `🔧 **Đổi prefix** - \`${guildPrefix}setprefix\`\n` +
                             `💸 **Gửi Rin** - \`${guildPrefix}grin @user\``,
+                        inline: true
+                    },
+                    {
+                        name: '🔮 AI & Tư vấn',
+                        value:
+                            `🔑 **Cài đặt AI** - \`${guildPrefix}setgemini\`\n` +
+                            `🔮 **Xem bói AI** - \`${guildPrefix}boi\`\n` +
+                            `🃏 **Bói Tarot** - \`${guildPrefix}boi tarot\`\n` +
+                            `❓ **Tư vấn ẩn danh** - \`${guildPrefix}hoi\`\n` +
+                            `🔒 **8 chủ đề tư vấn chuyên sâu**`,
                         inline: true
                     }
                 )

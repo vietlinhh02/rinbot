@@ -192,7 +192,7 @@ const JOB_TYPES = {
         description: "Viết bài báo bằng cách chat trong server. 50 tin nhắn = hoàn thành",
         workType: "chat_messages", // Chat trong server
         targetMessages: 50,
-        rewardPerMessage: 5, // 5 Rin/tin nhắn
+        rewardPerMessage: 2.4, // 2.4 Rin/tin nhắn = 120 Rin tổng
         cooldown: 4 * 60 * 60 * 1000 // 4 giờ
     },
     "mc": {

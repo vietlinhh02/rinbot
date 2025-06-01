@@ -17,13 +17,13 @@ module.exports = {
 
             if (user.lastDaily) {
                 const lastDaily = new Date(user.lastDaily);
-                const timeDiff = now - lastDaily;
-                const hoursDiff = timeDiff / (1000 * 60 * 60);
+                const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const lastDailyDate = new Date(lastDaily.getFullYear(), lastDaily.getMonth(), lastDaily.getDate());
 
-                if (hoursDiff < 24) {
+                if (today.getTime() === lastDailyDate.getTime()) {
                     const embed = new EmbedBuilder()
                         .setTitle('⏳ Đã nhận thưởng!')
-                        .setDescription('Bạn đã nhận Rin hôm nay rồi. Hãy quay lại sau 24 giờ!')
+                        .setDescription('Bạn đã nhận Rin hôm nay rồi. Hãy quay lại vào ngày mai!')
                         .setColor('#FF0000');
                     
                     return await message.reply({ embeds: [embed] });

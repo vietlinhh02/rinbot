@@ -228,10 +228,10 @@ async function handleStart(interaction, channelId) {
         });
     }
 
-    // Kiểm tra tối đa 6 người chơi (để không quá đông)
-    if (Object.keys(game.players).length > 6) {
+    // Kiểm tra tối đa 13 người chơi (để không quá đông)
+    if (Object.keys(game.players).length > 13) {
         return await interaction.reply({ 
-            content: '❌ Quá nhiều người chơi! Tối đa 6 người.', 
+            content: '❌ Quá nhiều người chơi! Tối đa 13 người.', 
             flags: 64 
         });
     }
@@ -295,7 +295,7 @@ async function updateGameMessage(message, channelId) {
             '• **Xì Bàn:** 2 con A (x3 tiền)\n' +
             '• **Xì Dách:** A + 10/J/Q/K (x2 tiền)\n' +
             '• **Ngũ Linh:** 5 lá ≤21 điểm (x2 tiền)\n\n' +
-            `**👥 Người chơi:** ${playerCount}/6\n` +
+            `**👥 Người chơi:** ${playerCount}/13\n` +
             '💡 *Bấm nút để tham gia!*')
         .addFields(
             { name: 'Nhà cái', value: game.host.toString(), inline: false },
@@ -623,7 +623,7 @@ module.exports = {
                     '• **Xì Bàn:** 2 con A (x3 tiền)\n' +
                     '• **Xì Dách:** A + 10/J/Q/K (x2 tiền)\n' +
                     '• **Ngũ Linh:** 5 lá ≤21 điểm (x2 tiền)\n\n' +
-                    '**👥 Người chơi:** 0/6\n' +
+                    '**👥 Người chơi:** 0/13\n' +
                     '💡 *Bấm nút để tham gia!*')
                 .addFields({ name: 'Nhà cái', value: message.author.toString(), inline: false })
                 .setColor('#0099FF');
