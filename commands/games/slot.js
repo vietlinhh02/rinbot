@@ -25,7 +25,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId, 
                 'slot', 
-                3, // 3 giây cooldown
+                2, // 3 giây cooldown
                 this.executeSlot,
                 this,
                 message,
@@ -73,9 +73,9 @@ module.exports = {
             }
         });
 
-        // Random 3 slot - có bias để thua nhiều hơn thắng
+        // Random 3 slot - 40% thua / 60% thắng
         const slots = [];
-        const houseBias = Math.random() < 0.5; // 55% bias về thua
+        const houseBias = Math.random() < 0.40; // 40% bias về thua
 
         if (houseBias) {
             // Tạo 3 slot khác nhau để thua (house edge)
@@ -89,17 +89,17 @@ module.exports = {
                 slots.push(key);
             }
         } else {
-            // 45% cơ hội có thể thắng (3 giống nhau)
+            // 60% cơ hội có thể thắng (3 giống nhau)
             const winChance = Math.random();
-            if (winChance < 0.45) { // 50% trong 45% = 22.5% tổng thể cho x1 (hoà vốn)
+            if (winChance < 0.50) { // 50% trong 60% = 30% tổng thể cho x1 (hoà vốn)
                 slots = ['breakeven', 'breakeven', 'breakeven'];
-            } else if (winChance < 0.90) { // 35% trong 45% = 15.75% cho x2 
+            } else if (winChance < 0.85) { // 35% trong 60% = 21% cho x2 
                 slots = ['common', 'common', 'common'];
-            } else if (winChance < 0.95) { // 10% trong 45% = 4.5% cho x2.5
+            } else if (winChance < 0.95) { // 10% trong 60% = 6% cho x2.5
                 slots = ['uncommon', 'uncommon', 'uncommon'];
-            } else if (winChance < 0.99) { // 4% trong 45% = 1.8% cho x4
+            } else if (winChance < 0.99) { // 4% trong 60% = 2.4% cho x4
                 slots = ['rare', 'rare', 'rare'];
-            } else { // 1% trong 45% = 0.45% cho x7 (cực hiếm)
+            } else { // 1% trong 60% = 0.6% cho x7 (cực hiếm)
                 slots = ['epic', 'epic', 'epic'];
             }
         }
@@ -107,78 +107,94 @@ module.exports = {
         return slots;
     },
 
-    // Animation slot với hiệu ứng trượt xuống
+    // Animation slot với hiệu ứng scroll down thật
     async playSlotAnimation(message, amount, finalResult) {
-        let display = ['❔', '❔', '❔'];
+        // Tạo scroll sequence cho mỗi slot
+        const getAllSymbols = () => Object.values(SYMBOLS).map(s => s.icon);
+        const allSymbols = getAllSymbols();
         
-        const initialEmbed = new EmbedBuilder()
-            .setTitle('🎰 SLOT MAY MẮN')
-            .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
-            .setColor('#FFD700')
-            .setFooter({ text: 'Đang quay...' });
-            
-        const sentMsg = await message.reply({ embeds: [initialEmbed] });
-
-        // Phase 1: Tất cả slot lăn cùng lúc
-        for (let i = 0; i < 8; i++) {
-            display[0] = ANIMATION_SYMBOLS[Math.floor(Math.random() * ANIMATION_SYMBOLS.length)];
-            display[1] = ANIMATION_SYMBOLS[Math.floor(Math.random() * ANIMATION_SYMBOLS.length)];
-            display[2] = ANIMATION_SYMBOLS[Math.floor(Math.random() * ANIMATION_SYMBOLS.length)];
-            
-            const animEmbed = new EmbedBuilder()
+        const sentMsg = await message.reply({ embeds: [
+            new EmbedBuilder()
                 .setTitle('🎰 SLOT MAY MẮN')
-                .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
-                .setColor('#FF6B6B')
-                .setFooter({ text: `🎰 Đang lăn... ${i+1}/8` });
+                .setDescription(`| ❔ | ❔ | ❔ |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+                .setColor('#FFD700')
+                .setFooter({ text: 'Đang khởi động...' })
+        ] });
+
+        // Phase 1: Tất cả scroll nhanh cùng lúc
+        for (let frame = 0; frame < 10; frame++) {
+            const display = [
+                allSymbols[frame % allSymbols.length],
+                allSymbols[(frame + 1) % allSymbols.length], 
+                allSymbols[(frame + 2) % allSymbols.length]
+            ];
             
-            await sentMsg.edit({ embeds: [animEmbed] });
+            await sentMsg.edit({ embeds: [
+                new EmbedBuilder()
+                    .setTitle('🎰 SLOT MAY MẮN')
+                    .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+                    .setColor('#FF6B6B')
+                    .setFooter({ text: `🎰 Đang quay tất cả... ${frame+1}/10` })
+            ] });
+            await this.sleep(100);
+        }
+
+        // Phase 2: Slot 1 dừng, 2&3 tiếp tục scroll
+        const slot1Result = SYMBOLS[finalResult[0]].icon;
+        for (let frame = 0; frame < 6; frame++) {
+            const display = [
+                slot1Result, // Slot 1 đã dừng
+                allSymbols[(frame + 3) % allSymbols.length],
+                allSymbols[(frame + 4) % allSymbols.length]
+            ];
+            
+            await sentMsg.edit({ embeds: [
+                new EmbedBuilder()
+                    .setTitle('🎰 SLOT MAY MẮN')
+                    .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+                    .setColor('#FFB347')
+                    .setFooter({ text: '🔒 Slot 1 dừng!' })
+            ] });
             await this.sleep(120);
         }
 
-        // Phase 2: Slot 1 dừng
-        display[0] = SYMBOLS[finalResult[0]].icon;
-        for (let i = 0; i < 4; i++) {
-            display[1] = ANIMATION_SYMBOLS[Math.floor(Math.random() * ANIMATION_SYMBOLS.length)];
-            display[2] = ANIMATION_SYMBOLS[Math.floor(Math.random() * ANIMATION_SYMBOLS.length)];
+        // Phase 3: Slot 2 dừng, chỉ slot 3 scroll
+        const slot2Result = SYMBOLS[finalResult[1]].icon;
+        for (let frame = 0; frame < 8; frame++) {
+            const display = [
+                slot1Result, // Slot 1 đã dừng
+                slot2Result, // Slot 2 vừa dừng
+                allSymbols[(frame + 5) % allSymbols.length]
+            ];
             
-            const animEmbed = new EmbedBuilder()
-                .setTitle('🎰 SLOT MAY MẮN')
-                .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
-                .setColor('#FFB347')
-                .setFooter({ text: '🔒 Slot 1 dừng!' });
-            
-            await sentMsg.edit({ embeds: [animEmbed] });
-            
+            await sentMsg.edit({ embeds: [
+                new EmbedBuilder()
+                    .setTitle('🎰 SLOT MAY MẮN')
+                    .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+                    .setColor('#FF8C69')
+                    .setFooter({ text: '🔒 Slot 2 dừng!' })
+            ] });
+            await this.sleep(150);
         }
 
-        // Phase 3: Slot 2 dừng
-        display[1] = SYMBOLS[finalResult[1]].icon;
-        for (let i = 0; i < 5; i++) {
-            display[2] = ANIMATION_SYMBOLS[Math.floor(Math.random() * ANIMATION_SYMBOLS.length)];
-            
-            const animEmbed = new EmbedBuilder()
-                .setTitle('🎰 SLOT MAY MẮN')
-                .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
-                .setColor('#FF8C69')
-                .setFooter({ text: '🔒 Slot 2 dừng!' });
-            
-            await sentMsg.edit({ embeds: [animEmbed] });
-            
-        }
-
-        // Phase 4: Slot 3 dừng (gay cấn)
-        display[2] = SYMBOLS[finalResult[2]].icon;
+        // Phase 4: Tất cả dừng
+        const finalDisplay = [
+            SYMBOLS[finalResult[0]].icon,
+            SYMBOLS[finalResult[1]].icon,
+            SYMBOLS[finalResult[2]].icon
+        ];
+        
         await sentMsg.edit({ embeds: [
             new EmbedBuilder()
                 .setTitle('🎰 SLOT MAY MẮN')
-                .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+                .setDescription(`| ${finalDisplay.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
                 .setColor('#DC143C')
                 .setFooter({ text: '🔒 Tất cả dừng!' })
         ] });
-        
+        await this.sleep(400);
         
         // Tính toán kết quả
-        await this.showFinalResult(sentMsg, amount, finalResult, display, message.author.id);
+        await this.showFinalResult(sentMsg, amount, finalResult, finalDisplay, message.author.id);
     },
 
     // Hiển thị kết quả cuối cùng
