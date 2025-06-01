@@ -217,21 +217,26 @@ module.exports = {
             });
 
             // Xác định có thể trộm gì
-            const canStealTrees = stealableTrees.length > 0;
+            const canStealTrees = stealableTrees.length > 0 && hasHouse; // CHỈ trộm cây khi có nhà
             const canStealHouseMoney = canStealMoney && hasHouse && !hasStealenMoneyToday;
 
             if (!canStealTrees && !canStealHouseMoney) {
                 let reason = '';
-                if (!canStealTrees && !hasHouse) {
-                    reason = `${targetUser.displayName} không có cây nào để trộm và không có nhà!`;
-                } else if (!canStealTrees && hasHouse) {
+                if (!hasHouse) {
+                    reason = `${targetUser.displayName} không có nhà trọ! Cần có nhà để có thể bị trộm cây hoặc tiền.`;
+                } else if (stealableTrees.length === 0) {
                     if (!canStealMoney) {
-                        reason = `${targetUser.displayName} không có cây để trộm và không trong giờ trộm tiền (19h-21h)!`;
+                        reason = `${targetUser.displayName} không có cây nào để trộm và không trong giờ trộm tiền (19h-21h)!`;
                     } else if (hasStealenMoneyToday) {
-                        reason = `${targetUser.displayName} không có cây để trộm và bạn đã trộm tiền nhà này hôm nay rồi!`;
+                        reason = `${targetUser.displayName} không có cây nào để trộm và bạn đã trộm tiền nhà này hôm nay rồi!`;
                     }
-                } else if (canStealTrees && hasHouse && hasStealenMoneyToday && !canStealMoney) {
-                    reason = `${targetUser.displayName} có cây nhưng không trong giờ trộm tiền và đã trộm tiền nhà này hôm nay!`;
+                } else {
+                    // Có cây nhưng không thể trộm vì các lý do khác
+                    if (!canStealMoney) {
+                        reason = `${targetUser.displayName} có cây nhưng không trong giờ trộm tiền (19h-21h)!`;
+                    } else if (hasStealenMoneyToday) {
+                        reason = `${targetUser.displayName} có cây nhưng bạn đã trộm tiền nhà này hôm nay rồi!`;
+                    }
                 }
                 return message.reply(`❌ ${reason}`);
             }

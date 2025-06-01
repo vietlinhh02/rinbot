@@ -67,8 +67,8 @@ module.exports = {
                 global.activeBreeding.add(breedingKey);
                 
                 try {
-                    // Nếu đã kết hôn với nhau, thử sinh sản
-                    return await this.tryBreeding(message, pet, targetPet, targetUser);
+                // Nếu đã kết hôn với nhau, thử sinh sản
+                return await this.tryBreeding(message, pet, targetPet, targetUser);
                 } finally {
                     // Luôn cleanup flag sau khi xong
                     global.activeBreeding.delete(breedingKey);
@@ -179,10 +179,10 @@ module.exports = {
 
         const isSuccess = Math.random() < successRate;
 
-        // Cập nhật lastBred cho cả hai thú  
+        // Cập nhật lastBred cho cả hai thú
         try {
-            await updatePet(pet1.userId, { lastBred: now });
-            await updatePet(targetUser.id, { lastBred: now });
+        await updatePet(pet1.userId, { lastBred: now });
+        await updatePet(targetUser.id, { lastBred: now });
             
             console.log(`✅ Breeding cooldown set: 24h for both pets`);
             

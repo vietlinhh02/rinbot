@@ -57,18 +57,18 @@ module.exports = {
                     }
                 } else {
                     // Kiểm tra cooldown tưới nước
-                    if (tree.lastWater) {
-                        const timeDiff = now - new Date(tree.lastWater);
-                        const minutesDiff = timeDiff / (1000 * 60);
-                        
-                        if (minutesDiff < 30) {
-                            const remainingMinutes = Math.ceil(30 - minutesDiff);
-                            cooldownText = `⏰ ${remainingMinutes}p nữa`;
-                        } else {
-                            cooldownText = '✅ Có thể tưới';
-                        }
+                if (tree.lastWater) {
+                    const timeDiff = now - new Date(tree.lastWater);
+                    const minutesDiff = timeDiff / (1000 * 60);
+                    
+                    if (minutesDiff < 30) {
+                        const remainingMinutes = Math.ceil(30 - minutesDiff);
+                        cooldownText = `⏰ ${remainingMinutes}p nữa`;
                     } else {
-                        cooldownText = '🆕 Chưa tưới';
+                        cooldownText = '✅ Có thể tưới';
+                    }
+                } else {
+                    cooldownText = '🆕 Chưa tưới';
                     }
                 }
                 
@@ -162,7 +162,7 @@ module.exports = {
         } else {
             harvestInfo = `⏳ **Cần thêm:** ${Math.max(0, 3 - freshTree.waterCount)} lần tưới`;
         }
-
+        
         const embed = new EmbedBuilder()
             .setTitle('💧 TƯỚI NƯỚC THÀNH CÔNG!')
             .setDescription(`**Cây số ${treeNumber}: ${freshTree.species}** của ${message.author.displayName}\n\n` +
