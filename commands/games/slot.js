@@ -74,7 +74,7 @@ module.exports = {
         });
 
         // Random 3 slot - 40% thua / 60% thắng
-        const slots = [];
+        let slots = [];
         const houseBias = Math.random() < 0.40; // 40% bias về thua
 
         if (houseBias) {
