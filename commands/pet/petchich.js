@@ -71,6 +71,9 @@ module.exports = {
             // Tạo lời mời ghép cặp
             const expiresAt = Date.now() + 60000; // 1 phút
             const invitationId = `${userId}_${targetUser.id}_${Date.now()}`;
+            
+            console.log(`Debug petchich create: Current: ${Date.now()}, ExpiresAt: ${expiresAt}, Duration: 60000ms`);
+            
             breedingInvitations.set(invitationId, {
                 sender: message.author,
                 target: targetUser,
@@ -79,6 +82,10 @@ module.exports = {
                 channelId: message.channel.id,
                 expiresAt: expiresAt 
             });
+            
+            // Verify invitation was saved correctly
+            const savedInvitation = breedingInvitations.get(invitationId);
+            console.log(`Debug verify save: ${invitationId} saved with expiresAt: ${savedInvitation?.expiresAt}`);
             const embed = new EmbedBuilder()
                 .setTitle('💕 LỜI MỜI GHÉP CẶP THÚ CƯNG')
                 .setDescription(`**${message.author.displayName}** muốn ghép cặp thú cưng với **${targetUser.displayName}**!\n\n` +
@@ -110,9 +117,13 @@ module.exports = {
             await message.reply({ embeds: [embed], components: [row] });
 
             // Tự động xóa lời mời sau 1 phút
+            const timeoutDuration = expiresAt - Date.now();
+            console.log(`Debug timeout: Setting timeout for ${timeoutDuration}ms`);
+            
             setTimeout(() => {
+                console.log(`Debug timeout: Deleting invitation ${invitationId} after timeout`);
                 breedingInvitations.delete(invitationId);
-            }, expiresAt - Date.now());
+            }, timeoutDuration);
 
         } catch (error) {
             console.error('Lỗi petchich:', error);
@@ -207,21 +218,32 @@ module.exports = {
     async handleInteraction(interaction) {
         if (!interaction.customId.startsWith('breed_')) return;
 
-        const [action, result, invitationId] = interaction.customId.split('_');
+        const parts = interaction.customId.split('_');
+        const action = parts[0]; // 'breed'
+        const result = parts[1]; // 'accept' hoặc 'reject'
+        const invitationId = parts.slice(2).join('_'); // Ghép lại phần còn lại vì có thể có dấu _ trong ID
+        
+        console.log(`Debug handleInteraction: CustomId: ${interaction.customId}, InvitationId: ${invitationId}`);
+        
         const invitation = breedingInvitations.get(invitationId);
 
         if (!invitation) {
-            return interaction.reply({ content: '❌ Lời mời đã hết hạn!', ephemeral: true });
+            return interaction.reply({ content: '❌ Lời mời đã hết hạn!', flags: 64 });
         }
 
         // Kiểm tra thời gian hết hạn chính xác
-        if (Date.now() > invitation.expiresAt) {
+        const currentTime = Date.now();
+        const timeLeft = invitation.expiresAt - currentTime;
+        
+        console.log(`Debug petchich: Current: ${currentTime}, Expires: ${invitation.expiresAt}, Time left: ${timeLeft}ms`);
+        
+        if (currentTime > invitation.expiresAt) {
             breedingInvitations.delete(invitationId);
-            return interaction.reply({ content: '❌ Lời mời đã hết hạn!', ephemeral: true });
+            return interaction.reply({ content: `❌ Lời mời đã hết hạn! (Hết hạn ${Math.abs(timeLeft)}ms trước)`, flags: 64 });
         }
 
         if (interaction.user.id !== invitation.target.id) {
-            return interaction.reply({ content: '❌ Chỉ người được tag mới có thể phản hồi!', ephemeral: true });
+            return interaction.reply({ content: '❌ Chỉ người được tag mới có thể phản hồi!', flags: 64 });
         }
 
         if (result === 'accept') {
@@ -258,7 +280,7 @@ module.exports = {
 
             } catch (error) {
                 console.error('Lỗi kết hôn pet:', error);
-                await interaction.reply({ content: '❌ Có lỗi xảy ra khi kết hôn!', ephemeral: true });
+                await interaction.reply({ content: '❌ Có lỗi xảy ra khi kết hôn!', flags: 64 });
             }
 
         } else {
