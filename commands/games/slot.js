@@ -122,7 +122,7 @@ module.exports = {
         ] });
 
         // Phase 1: Tất cả scroll nhanh cùng lúc
-        for (let frame = 0; frame < 10; frame++) {
+        for (let frame = 0; frame < 8; frame++) {
             const display = [
                 allSymbols[frame % allSymbols.length],
                 allSymbols[(frame + 1) % allSymbols.length], 
@@ -134,14 +134,14 @@ module.exports = {
                     .setTitle('🎰 SLOT MAY MẮN')
                     .setDescription(`| ${display.join(' | ')} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
                     .setColor('#FF6B6B')
-                    .setFooter({ text: `🎰 Đang quay tất cả... ${frame+1}/10` })
+                    .setFooter({ text: `🎰 Đang quay...` })
             ] });
-            await this.sleep(100);
+            await this.sleep(80);
         }
 
         // Phase 2: Slot 1 dừng, 2&3 tiếp tục scroll
         const slot1Result = SYMBOLS[finalResult[0]].icon;
-        for (let frame = 0; frame < 6; frame++) {
+        for (let frame = 0; frame < 4; frame++) {
             const display = [
                 slot1Result, // Slot 1 đã dừng
                 allSymbols[(frame + 3) % allSymbols.length],
@@ -155,12 +155,12 @@ module.exports = {
                     .setColor('#FFB347')
                     .setFooter({ text: '🔒 Slot 1 dừng!' })
             ] });
-            await this.sleep(120);
+            await this.sleep(60);
         }
 
         // Phase 3: Slot 2 dừng, chỉ slot 3 scroll
         const slot2Result = SYMBOLS[finalResult[1]].icon;
-        for (let frame = 0; frame < 8; frame++) {
+        for (let frame = 0; frame < 5; frame++) {
             const display = [
                 slot1Result, // Slot 1 đã dừng
                 slot2Result, // Slot 2 vừa dừng
@@ -174,7 +174,7 @@ module.exports = {
                     .setColor('#FF8C69')
                     .setFooter({ text: '🔒 Slot 2 dừng!' })
             ] });
-            await this.sleep(150);
+            await this.sleep(70);
         }
 
         // Phase 4: Tất cả dừng
@@ -191,7 +191,7 @@ module.exports = {
                 .setColor('#DC143C')
                 .setFooter({ text: '🔒 Tất cả dừng!' })
         ] });
-        await this.sleep(400);
+        await this.sleep(200);
         
         // Tính toán kết quả
         await this.showFinalResult(sentMsg, amount, finalResult, finalDisplay, message.author.id);
