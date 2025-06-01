@@ -91,7 +91,7 @@ module.exports = {
             await new Promise(resolve => setTimeout(resolve, 2000));
             
             const embed = new EmbedBuilder()
-                .setTitle('🔮 QUAÛ CAàU PHA LEA NÓI...')
+                .setTitle('🔮 Quả Cầu Pha Lê đã trả lời')
                 .setDescription(`**Câu hỏi của bạn:**\n*"${question}"*\n\n**Câu trả lời:**\n${randomResponse}`)
                 .setColor(embedColor)
                 .setFooter({ 
