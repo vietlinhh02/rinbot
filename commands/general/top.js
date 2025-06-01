@@ -5,7 +5,7 @@ const { getPrefix } = require('../../utils/prefixHelper');
 module.exports = {
     name: 'top',
     description: 'Xem bảng xếp hạng người giàu nhất',
-    async execute(message, args) {
+    async execute(message, args, client) {
         try {
             const prefix = await getPrefix(message.guild?.id);
             
@@ -90,7 +90,7 @@ module.exports = {
                 .setTitle(title)
                 .setDescription(description)
                 .setColor(embedColor)
-                .setThumbnail('https://i.imgur.com/WQMigGs.jpeg');
+                .setThumbnail(client.user.displayAvatarURL());
 
             // Tạo danh sách top users
             let topList = '';

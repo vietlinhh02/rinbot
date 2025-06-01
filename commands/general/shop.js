@@ -49,7 +49,7 @@ const SHOP_ITEMS = {
 module.exports = {
     name: 'shop',
     description: 'Xem cửa hàng mua đồ',
-    async execute(message, args) {
+    async execute(message, args, client) {
         try {
             const prefix = await getPrefix(message.guild?.id);
             const userId = message.author.id;
@@ -111,7 +111,7 @@ module.exports = {
                     `• \`${prefix}inventory\` - Xem túi đồ\n` +
                     `• \`${prefix}use [item] [@user]\` - Sử dụng đồ`)
                 .setColor('#E74C3C')
-                .setThumbnail('https://i.imgur.com/WQMigGs.jpeg');
+                .setThumbnail(client.user.displayAvatarURL());
 
             // Thêm pet items
             if (petItems) {
