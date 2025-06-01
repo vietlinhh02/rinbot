@@ -4,14 +4,14 @@ const { getPrefix } = require('../../utils/prefixHelper');
 module.exports = {
     name: 'boihelp',
     description: 'Hướng dẫn sử dụng tính năng bói AI',
-    async execute(message, args) {
+    async execute(message, args, client) {
         const prefix = await getPrefix(message.guild?.id);
         
         const embed = new EmbedBuilder()
             .setTitle('🔮 HƯỚNG DẪN XEM BÓI AI')
             .setDescription('**Tính năng xem bói bằng Gemini AI**')
             .setColor('#9B59B6')
-            .setThumbnail('https://raw.githubusercontent.com/vietlinhh02/test/refs/heads/main/d098bf056c1a3a3f23261606edde04de.png');
+            .setThumbnail(client.user.displayAvatarURL());
 
         // Bước cài đặt
         embed.addFields({

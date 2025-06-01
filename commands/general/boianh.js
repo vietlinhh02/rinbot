@@ -7,7 +7,7 @@ const { getPrefix } = require('../../utils/prefixHelper');
 module.exports = {
     name: 'boianh',
     description: 'Xem bói từ hình ảnh bản đồ sao, tử vi',
-    async execute(message, args) {
+    async execute(message, args, client) {
         try {
             const userId = message.author.id;
             const prefix = await getPrefix(message.guild?.id);
@@ -41,7 +41,7 @@ module.exports = {
                         `• Đính kèm ảnh + \`${prefix}boianh\`\n` +
                         `• Đính kèm ảnh + \`${prefix}boianh Tình yêu của tôi sẽ ra sao?\``)
                     .setColor('#9B59B6')
-                    .setThumbnail('https://raw.githubusercontent.com/vietlinhh02/test/refs/heads/main/d098bf056c1a3a3f23261606edde04de.png')
+                    .setThumbnail(client.user.displayAvatarURL())
                     .setFooter({ text: 'Hãy đính kèm hình ảnh và thử lại!' });
 
                 return await message.reply({ embeds: [helpEmbed] });

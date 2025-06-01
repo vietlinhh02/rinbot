@@ -36,7 +36,7 @@ const BOI_TYPES = {
 module.exports = {
     name: 'boi',
     description: 'Xem bói bằng AI Gemini',
-    async execute(message, args) {
+    async execute(message, args, client) {
         try {
             const userId = message.author.id;
             const prefix = await getPrefix(message.guild?.id);
@@ -59,7 +59,7 @@ module.exports = {
                         `• \`${prefix}boi sao\` - Bói sao\n` +
                         `• \`${prefix}boi caocap\` - Bói cao cấp`)
                     .setColor('#FF6B6B')
-                    .setThumbnail('https://i.imgur.com/fX8SdqQ.png');
+                    .setThumbnail(client.user.displayAvatarURL());
 
                 return await message.reply({ embeds: [noKeyEmbed] });
             }
