@@ -135,12 +135,24 @@ module.exports = {
     async tryBreeding(message, pet1, pet2, targetUser) {
         const now = new Date();
         
-        // Kiểm tra cooldown breeding (24 giờ)
+        // Kiểm tra cooldown breeding (24 giờ) cho CẢ HAI thú cưng
+        console.log(`Debug breeding: Pet1 lastBred: ${pet1.lastBred}, Pet2 lastBred: ${pet2.lastBred}`);
+        
         if (pet1.lastBred) {
-            const hoursSinceLastBred = (now - new Date(pet1.lastBred)) / (1000 * 60 * 60);
-            if (hoursSinceLastBred < 24) {
-                const remainingHours = Math.ceil(24 - hoursSinceLastBred);
-                return message.reply(`⏰ Thú cưng vẫn đang nghỉ ngơi sau lần sinh sản trước! Hãy quay lại sau **${remainingHours} giờ**.`);
+            const hoursSinceLastBred1 = (now - new Date(pet1.lastBred)) / (1000 * 60 * 60);
+            console.log(`Debug breeding: Pet1 hours since last bred: ${hoursSinceLastBred1}`);
+            if (hoursSinceLastBred1 < 24) {
+                const remainingHours = Math.ceil(24 - hoursSinceLastBred1);
+                return message.reply(`⏰ Thú cưng của ${message.author.displayName} vẫn đang nghỉ ngơi sau lần sinh sản trước! Hãy quay lại sau **${remainingHours} giờ**.`);
+            }
+        }
+        
+        if (pet2.lastBred) {
+            const hoursSinceLastBred2 = (now - new Date(pet2.lastBred)) / (1000 * 60 * 60);
+            console.log(`Debug breeding: Pet2 hours since last bred: ${hoursSinceLastBred2}`);
+            if (hoursSinceLastBred2 < 24) {
+                const remainingHours = Math.ceil(24 - hoursSinceLastBred2);
+                return message.reply(`⏰ Thú cưng của ${targetUser.displayName} vẫn đang nghỉ ngơi sau lần sinh sản trước! Hãy quay lại sau **${remainingHours} giờ**.`);
             }
         }
 
@@ -157,13 +169,14 @@ module.exports = {
         const isSuccess = Math.random() < successRate;
 
         // Cập nhật lastBred cho cả hai thú
+        console.log(`Debug breeding: Updating lastBred to ${now} for both pets`);
         await updatePet(pet1.userId, { lastBred: now });
         await updatePet(targetUser.id, { lastBred: now });
 
         if (isSuccess) {
             // Sinh sản thành công
-            const breedCount1 = pet1.breedCount + 1;
-            const breedCount2 = pet2.breedCount + 1;
+            const breedCount1 = (pet1.breedCount || 0) + 1;
+            const breedCount2 = (pet2.breedCount || 0) + 1;
             
             await updatePet(pet1.userId, { breedCount: breedCount1 });
             await updatePet(targetUser.id, { breedCount: breedCount2 });
