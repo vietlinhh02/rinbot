@@ -305,19 +305,19 @@ module.exports = {
                 let multiplier = 0;
                 if (count === 1) {
                     multiplier = 1;
-                    winAmount = amount * multiplier;
+                    winAmount = amount + (amount * multiplier); // Hoàn lại tiền cược + tiền thưởng
                     totalWin += winAmount;
                     botNetWinnings -= winAmount; // Bot mất tiền khi người chơi thắng
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} +${winAmount}`);
                 } else if (count === 2) {
                     multiplier = 2;
-                    winAmount = amount * multiplier;
+                    winAmount = amount + (amount * multiplier); // Hoàn lại tiền cược + tiền thưởng
                     totalWin += winAmount;
                     botNetWinnings -= winAmount; // Bot mất tiền khi người chơi thắng
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} +${winAmount}`);
                 } else if (count === 3) {
                     multiplier = 4;
-                    winAmount = amount * multiplier;
+                    winAmount = amount + (amount * multiplier); // Hoàn lại tiền cược + tiền thưởng
                     totalWin += winAmount;
                     botNetWinnings -= winAmount; // Bot mất tiền khi người chơi thắng
                     betResults.push(`${BAU_CUA_EMOJIS[animal]} +${winAmount}`);
@@ -328,9 +328,9 @@ module.exports = {
                 }
             }
 
-            // Cộng tiền thắng cho người chơi (lấy lại tiền cược + tiền thắng)
+            // Cộng tiền thắng cho người chơi (hoàn lại tiền cược + tiền thưởng)
             if (totalWin > 0) {
-                await updateUserRin(userId, totalWin);
+                await updateUserRin(userId, totalWin); // Cộng tổng tiền nhận được
             }
 
             const netResult = totalWin - totalLoss;

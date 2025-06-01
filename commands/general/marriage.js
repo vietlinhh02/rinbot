@@ -137,25 +137,43 @@ module.exports = {
 
             const marriageEmbed = new EmbedBuilder()
                 .setTitle('💒 THÔNG TIN HÔN NHÂN')
-                .setDescription(`**${targetUser.displayName}** ${targetUserId === userId ? '(Bạn)' : ''}\n\n` +
-                    `**💕 Thông tin cơ bản:**\n` +
-                    `💖 **Vợ/Chồng:** ${partner.displayName}\n` +
-                    `${ringInfo.emoji} **Nhẫn:** ${ringInfo.name}\n` +
-                    `📅 **Ngày cưới:** ${new Date(marriage.marriedAt).toLocaleDateString('vi-VN')}\n` +
-                    `⏰ **Đã cưới:** ${marriedDays} ngày\n\n` +
-                    `**📊 Level nhẫn:**\n` +
-                    `💖 **Level:** ${currentLevel}/${ringInfo.maxLevel} ${isMaxLevel ? '🌟 MAX' : ''}\n` +
-                    `📈 **EXP:** ${isMaxLevel ? 'MAX' : `${levelData.currentExp}/${levelData.nextExp}`}\n` +
-                    `${progressBar} ${isMaxLevel ? '100%' : Math.floor((levelData.currentExp / levelData.nextExp) * 100) + '%'}\n` +
-                    `🎁 **Thưởng/level:** ${ringInfo.levelUpReward} Rin\n\n` +
-                    `**🎯 Chi tiết EXP:**\n` +
-                    `💬 **Chat EXP:** ${marriage.chatExp.toLocaleString()}\n` +
-                    `🔊 **Voice EXP:** ${marriage.voiceExp.toLocaleString()}\n` +
-                    `✨ **Tổng EXP:** ${totalExp.toLocaleString()}\n` +
-                    `⚡ **Tốc độ:** ×${ringInfo.expMultiplier}\n\n` +
-                    `**📅 Hoạt động gần đây:**\n` +
-                    `💬 **Chat cuối:** ${lastChatDays !== null ? (lastChatDays === 0 ? 'Hôm nay' : `${lastChatDays} ngày trước`) : 'Chưa có'}\n` +
-                    `🔊 **Voice cuối:** ${lastVoiceDays !== null ? (lastVoiceDays === 0 ? 'Hôm nay' : `${lastVoiceDays} ngày trước`) : 'Chưa có'}`)
+                .setDescription(`**${targetUser.displayName}** ${targetUserId === userId ? '(Bạn)' : ''}`)
+                .addFields(
+                    {
+                        name: '💕 Thông tin cơ bản',
+                        value: `💖 **Vợ/Chồng:** ${partner.displayName}\n` +
+                               `${ringInfo.emoji} **Nhẫn:** ${ringInfo.name}\n` +
+                               `📅 **Ngày cưới:** ${new Date(marriage.marriedAt).toLocaleDateString('vi-VN')}\n` +
+                               `⏰ **Đã cưới:** ${marriedDays} ngày`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Level & EXP',
+                        value: `💖 **Level:** ${currentLevel}/${ringInfo.maxLevel} ${isMaxLevel ? '🌟' : ''}\n` +
+                               `📈 **EXP:** ${isMaxLevel ? 'MAX' : `${levelData.currentExp}/${levelData.nextExp}`}\n` +
+                               `✨ **Tổng EXP:** ${totalExp.toLocaleString()}\n` +
+                               `🎁 **Thưởng/level:** ${ringInfo.levelUpReward} Rin`,
+                        inline: true
+                    },
+                    {
+                        name: '🎯 Chi tiết EXP',
+                        value: `💬 **Chat:** ${marriage.chatExp.toLocaleString()}\n` +
+                               `🔊 **Voice:** ${marriage.voiceExp.toLocaleString()}\n` +
+                               `⚡ **Tốc độ:** ×${ringInfo.expMultiplier}`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 Tiến trình Level',
+                        value: `${progressBar} ${isMaxLevel ? '100%' : Math.floor((levelData.currentExp / levelData.nextExp) * 100) + '%'}`,
+                        inline: false
+                    },
+                    {
+                        name: '📅 Hoạt động gần đây',
+                        value: `💬 **Chat cuối:** ${lastChatDays !== null ? (lastChatDays === 0 ? 'Hôm nay' : `${lastChatDays} ngày trước`) : 'Chưa có'}\n` +
+                               `🔊 **Voice cuối:** ${lastVoiceDays !== null ? (lastVoiceDays === 0 ? 'Hôm nay' : `${lastVoiceDays} ngày trước`) : 'Chưa có'}`,
+                        inline: false
+                    }
+                )
                 .setColor('#FF69B4')
                 .setThumbnail(targetUser.displayAvatarURL());
 

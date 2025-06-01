@@ -67,16 +67,16 @@ module.exports = {
                 }
             });
 
-            // Tạo danh sách items theo category
+            // Tạo danh sách items theo category (gọn gàng hơn)
             const petItems = Object.entries(SHOP_ITEMS)
                 .filter(([key, item]) => item.category === 'pet')
                 .map(([key, item]) => {
                     const owned = inventory[key] || 0;
                     const canAfford = userRin >= item.price ? '✅' : '❌';
-                    return `${item.emoji} **${item.name}** - ${item.price.toLocaleString()} Rin ${canAfford}\n` +
-                           `   📖 ${item.description}\n` +
-                           `   📦 Đang có: ${owned} cái\n` +
-                           `   💡 Mua: \`${prefix}buy ${key}\``;
+                    return `${item.emoji} **${item.name}** ${canAfford}\n` +
+                           `💰 ${item.price.toLocaleString()} Rin\n` +
+                           `📦 Có: ${owned} cái\n` +
+                           `💡 \`${prefix}buy ${key}\``;
                 }).join('\n\n');
 
             const utilityItems = Object.entries(SHOP_ITEMS)
@@ -84,10 +84,10 @@ module.exports = {
                 .map(([key, item]) => {
                     const owned = inventory[key] || 0;
                     const canAfford = userRin >= item.price ? '✅' : '❌';
-                    return `${item.emoji} **${item.name}** - ${item.price.toLocaleString()} Rin ${canAfford}\n` +
-                           `   📖 ${item.description}\n` +
-                           `   📦 Đang có: ${owned} cái\n` +
-                           `   💡 Mua: \`${prefix}buy ${key}\``;
+                    return `${item.emoji} **${item.name}** ${canAfford}\n` +
+                           `💰 ${item.price.toLocaleString()} Rin\n` +
+                           `📦 Có: ${owned} cái\n` +
+                           `💡 \`${prefix}buy ${key}\``;
                 }).join('\n\n');
 
             const marriageItems = Object.entries(SHOP_ITEMS)
@@ -95,70 +95,62 @@ module.exports = {
                 .map(([key, item]) => {
                     const owned = inventory[key] || 0;
                     const canAfford = userRin >= item.price ? '✅' : '❌';
-                    return `${item.emoji} **${item.name}** - ${item.price.toLocaleString()} Rin ${canAfford}\n` +
-                           `   📖 ${item.description}\n` +
-                           `   📦 Đang có: ${owned} cái\n` +
-                           `   💡 Mua: \`${prefix}buy ${key}\``;
+                    return `${item.emoji} **${item.name}** ${canAfford}\n` +
+                           `💰 ${item.price.toLocaleString()} Rin\n` +
+                           `📦 Có: ${owned} cái\n` +
+                           `💡 \`${prefix}buy ${key}\``;
                 }).join('\n\n');
 
             const shopEmbed = new EmbedBuilder()
                 .setTitle('🏪 CỬA HÀNG RINBOT')
-                .setDescription('**Chào mừng đến với cửa hàng!** 🛒\n\n' +
-                    `**💰 Số Rin của bạn:** ${userRin.toLocaleString()} Rin\n` +
-                    `**💎 Giá trị inventory:** ${inventoryValue.toLocaleString()} Rin\n\n` +
-                    '**📋 Cách mua hàng:**\n' +
-                    `• \`${prefix}buy [tên item]\` - Mua đồ\n` +
-                    `• \`${prefix}inventory\` - Xem túi đồ\n` +
-                    `• \`${prefix}use [item] [@user]\` - Sử dụng đồ`)
+                .setDescription(`**💰 Số Rin:** ${userRin.toLocaleString()} Rin | **💎 Giá trị túi đồ:** ${inventoryValue.toLocaleString()} Rin`)
+                .addFields(
+                    {
+                        name: '🐾 Đồ dùng thú cưng',
+                        value: petItems || 'Không có sản phẩm',
+                        inline: true
+                    },
+                    {
+                        name: '⚙️ Đồ dùng tiện ích',
+                        value: utilityItems || 'Không có sản phẩm',
+                        inline: true
+                    },
+                    {
+                        name: '💒 Nhẫn cưới',
+                        value: marriageItems || 'Không có sản phẩm',
+                        inline: true
+                    }
+                )
                 .setColor('#E74C3C')
                 .setThumbnail(client.user.displayAvatarURL());
 
-            // Thêm pet items
-            if (petItems) {
-                shopEmbed.addFields({
-                    name: '🐾 Đồ dùng thú cưng',
-                    value: petItems,
-                    inline: false
-                });
-            }
-
-            // Thêm utility items  
-            if (utilityItems) {
-                shopEmbed.addFields({
-                    name: '⚙️ Đồ dùng tiện ích',
-                    value: utilityItems,
-                    inline: false
-                });
-            }
-
-            // Thêm marriage items
-            if (marriageItems) {
-                shopEmbed.addFields({
-                    name: '💒 Nhẫn cưới',
-                    value: marriageItems,
-                    inline: false
-                });
-            }
-
-            // Thêm hướng dẫn chi tiết
-            shopEmbed.addFields({
-                name: '📚 Chi tiết sản phẩm',
-                value: Object.entries(SHOP_ITEMS).map(([key, item]) => 
-                    `**${item.emoji} ${item.name}:**\n${item.details}`
-                ).join('\n\n'),
-                inline: false
-            });
-
-            // Thêm thông tin kiếm Rin
-            shopEmbed.addFields({
-                name: '💡 Cách kiếm Rin',
-                value: `• \`${prefix}rindaily\` - Nhận 200 Rin mỗi ngày\n` +
-                       `• \`${prefix}work\` - Làm việc kiếm 50-150 Rin\n` +
-                       `• \`${prefix}baucua\` - Chơi bầu cua may mắn\n` +
-                       `• \`${prefix}muacay\` - Đầu tư farm sinh lời\n` +
-                       `• \`${prefix}top\` - Xem bảng xếp hạng`,
-                inline: false
-            });
+            // Thêm hướng dẫn sử dụng
+            shopEmbed.addFields(
+                {
+                    name: '📋 Hướng dẫn mua hàng',
+                    value: `• \`${prefix}buy [tên]\` - Mua đồ\n` +
+                           `• \`${prefix}inventory\` - Xem túi đồ\n` +
+                           `• \`${prefix}use [item] [@user]\` - Sử dụng`,
+                    inline: true
+                },
+                {
+                    name: '💡 Cách kiếm Rin',
+                    value: `• \`${prefix}rindaily\` - 200 Rin/ngày\n` +
+                           `• \`${prefix}work\` - 50-150 Rin\n` +
+                           `• \`${prefix}baucua\` - Chơi may mắn\n` +
+                           `• \`${prefix}muacay\` - Đầu tư farm`,
+                    inline: true
+                },
+                {
+                    name: '📚 Chi tiết sản phẩm',
+                    value: `**💊 Thuốc:** Chữa bệnh thú cưng\n` +
+                           `**🎒 Balo:** +5 slots túi đồ\n` +
+                           `**💍 Nhẫn Kim:** Max lv10, exp x1\n` +
+                           `**💎 Nhẫn Bạc:** Max lv20, exp x1.5\n` +
+                           `**👑 Nhẫn Vàng:** Max lv50, exp x2`,
+                    inline: true
+                }
+            )
 
             shopEmbed.setFooter({ 
                 text: 'Cửa hàng 24/7 • Hàng chất lượng cao • Giá cả phải chăng!',
