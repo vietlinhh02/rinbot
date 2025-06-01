@@ -1,4 +1,4 @@
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 
 module.exports = {
     name: 'grin',
@@ -9,25 +9,24 @@ module.exports = {
             const amount = parseInt(args[1]);
 
             if (!member) {
-                return await message.reply('❌ Bạn cần mention người nhận!');
+                return await message.reply('❌ Mention người nhận!');
             }
 
             if (!amount || amount <= 0) {
-                return await message.reply('❌ Số Rin phải lớn hơn 0!');
+                return await message.reply('❌ Số dương!');
             }
 
-            const senderRin = await getUserRin(message.author.id);
-            if (senderRin < amount) {
-                return await message.reply('❌ Bạn không đủ Rin!');
+            if (!(await FastUtils.canAfford(message.author.id, amount))) {
+                return await message.reply('❌ Không đủ Rin!');
             }
 
-            await updateUserRin(message.author.id, -amount);
-            await updateUserRin(member.id, amount);
+            await FastUtils.updateFastUserRin(message.author.id, -amount);
+            await FastUtils.updateFastUserRin(member.id, amount);
 
-            await message.reply(`💸 ${message.author} đã gửi **${amount} Rin** cho ${member}!`);
+            await message.reply(`💸 ${message.author} gửi **${FastUtils.fastFormat(amount)} Rin** cho ${member}!`);
         } catch (error) {
             console.error('Lỗi grin:', error);
-            await message.reply('❌ Có lỗi xảy ra!');
+            await message.reply('❌ Lỗi!');
         }
     }
 }; 

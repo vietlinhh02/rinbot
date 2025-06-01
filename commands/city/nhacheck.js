@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-const { getCityUser, getUserRin } = require('../../utils/database');
+const { getCityUser } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { JOB_TYPES, HOUSE_IMAGES, COLORS } = require('../../utils/constants');
 
 module.exports = {
@@ -10,7 +11,7 @@ module.exports = {
         try {
             const userId = message.author.id;
             const cityUser = await getCityUser(userId);
-            const userRin = await getUserRin(userId);
+            const userRin = await FastUtils.getFastUserRin(userId);
 
             if (!cityUser.home) {
                 return message.reply('❌ Bạn chưa thuê nhà! Hãy dùng lệnh `,thuenha` để thuê nhà.');

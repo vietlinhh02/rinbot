@@ -1,6 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { getPet, updatePet } = require('../../utils/database');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { PET_TYPES, PET_IMAGES } = require('../../utils/constants');
 
 module.exports = {
@@ -12,12 +12,11 @@ module.exports = {
             const existingPet = await getPet(userId);
             
             if (existingPet) {
-                return await message.reply('❌ Bạn đã sở hữu một thú cưng rồi!');
+                return await message.reply('❌ Đã có thú cưng!');
             }
 
-            const userRin = await getUserRin(userId);
-            if (userRin < 100) {
-                return await message.reply('❌ Bạn không đủ 100 Rin để mua thú cưng!');
+            if (!(await FastUtils.canAfford(userId, 100))) {
+                return await message.reply('❌ Cần 100 Rin!');
             }
 
             // Hiển thị menu chọn thú cưng
@@ -114,12 +113,11 @@ module.exports = {
     async purchasePet(interaction, petType, gender, userId) {
         try {
             // Kiểm tra lại Rin trước khi mua
-            const userRin = await getUserRin(userId);
-            if (userRin < 100) {
+            if (!(await FastUtils.canAfford(userId, 100))) {
                 return await interaction.update({
                     embeds: [new EmbedBuilder()
                         .setTitle('❌ KHÔNG ĐỦ RIN')
-                        .setDescription('Bạn không còn đủ 100 Rin để mua thú cưng!')
+                        .setDescription('Không đủ 100 Rin!')
                         .setColor('#FF0000')],
                     components: []
                 });
@@ -148,7 +146,7 @@ module.exports = {
                 married: false
             });
 
-            await updateUserRin(userId, -100);
+            await FastUtils.updateFastUserRin(userId, -100);
 
             const embed = new EmbedBuilder()
                 .setTitle('🎉 MUA THÚ CƯNG THÀNH CÔNG!')

@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { BAU_CUA_ANIMALS, BAU_CUA_EMOJIS } = require('../../utils/constants');
 
 // Lưu trữ các ván game đang diễn ra
@@ -186,9 +186,8 @@ module.exports = {
                 return interaction.reply({ content: '❌ Số Rin không hợp lệ!', ephemeral: true });
             }
 
-            const userRin = await getUserRin(interaction.user.id);
-            if (userRin < amount) {
-                return interaction.reply({ content: '❌ Bạn không đủ Rin!', ephemeral: true });
+            if (!(await FastUtils.canAfford(interaction.user.id, amount))) {
+                return interaction.reply({ content: '❌ Không đủ Rin!', ephemeral: true });
             }
 
             // Lưu cược
@@ -248,7 +247,7 @@ module.exports = {
             }
 
             // Trừ tiền
-            await updateUserRin(interaction.user.id, -totalBet);
+                            await FastUtils.updateFastUserRin(interaction.user.id, -totalBet);
 
             // Tạo embed hiển thị cược
             const betDisplay = Object.entries(userBets)
@@ -363,7 +362,7 @@ module.exports = {
 
                 // Cộng tiền thắng cho người chơi (hoàn lại tiền cược + tiền thưởng)
                 if (totalWin > 0) {
-                    await updateUserRin(userId, totalWin); // Cộng tổng tiền nhận được
+                    await FastUtils.updateFastUserRin(userId, totalWin); // Cộng tổng tiền nhận được
                 }
 
                 const netResult = totalWin - totalLoss;
@@ -373,7 +372,7 @@ module.exports = {
 
             // Cập nhật tiền cho nhà cái
             if (hostNetWinnings !== 0) {
-                await updateUserRin(game.host.id, hostNetWinnings);
+                await FastUtils.updateFastUserRin(game.host.id, hostNetWinnings);
             }
 
             resultEmbed.setDescription(resultEmbed.data.description + '\n\n' + resultText);
@@ -394,7 +393,7 @@ module.exports = {
             for (const [userId, userBets] of game.bets) {
                 const totalRefund = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
                 if (totalRefund > 0) {
-                    await updateUserRin(userId, totalRefund);
+                    await FastUtils.updateFastUserRin(userId, totalRefund);
                 }
             }
 

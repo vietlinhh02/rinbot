@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
 const AntiSpamManager = require('../../utils/antiSpam');
@@ -16,7 +16,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId, 
                 'bonphan', 
-                3, // 3 giây cooldown
+                1, // Giảm cooldown
                 this.executeBonPhan,
                 this,
                 message,
@@ -67,9 +67,8 @@ module.exports = {
         }
 
         // Kiểm tra số Rin
-        const userRin = await getUserRin(userId);
-        if (userRin < 30) {
-            return message.reply('❌ Bạn cần 30 Rin để mua phân bón!');
+        if (!(await FastUtils.canAfford(userId, 30))) {
+            return message.reply('❌ Cần 30 Rin!');
         }
 
         // Kiểm tra lại trạng thái cây trước khi thực hiện (tránh race condition)
@@ -93,7 +92,7 @@ module.exports = {
         }
 
         // Trừ tiền và bón phân
-        await updateUserRin(userId, -30);
+        await FastUtils.updateFastUserRin(userId, -30);
         
         const now = new Date();
         

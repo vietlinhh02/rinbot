@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { TREE_VALUES, TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
 const AntiSpamManager = require('../../utils/antiSpam');
@@ -16,7 +16,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId, 
                 'thuhoach', 
-                2, // 2 giây cooldown
+                1, // Giảm cooldown
                 this.executeThuHoach,
                 this,
                 message,
@@ -97,7 +97,7 @@ module.exports = {
                 await Tree.deleteOne({ _id: tree._id });
             }
             
-            await updateUserRin(userId, totalReward);
+            await FastUtils.updateFastUserRin(userId, totalReward);
             
             const embed = new EmbedBuilder()
                 .setTitle('🎉 THU HOẠCH TẤT CẢ THÀNH CÔNG!')
@@ -161,7 +161,7 @@ module.exports = {
         const profit = reward - 50; // Trừ đi giá hạt giống
         const profitText = freshTree.bonused ? profit - 30 : profit; // Trừ thêm tiền phân nếu có
 
-        await updateUserRin(userId, reward);
+        await FastUtils.updateFastUserRin(userId, reward);
         await Tree.deleteOne({ _id: freshTree._id }); // Xóa cây sau khi thu hoạch
 
         // Tính thống kê

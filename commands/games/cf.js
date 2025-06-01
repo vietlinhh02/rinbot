@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
@@ -13,7 +13,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId, 
                 'cf', 
-                2, // 2 giây cooldown
+                1, // 1 giây cooldown - nhanh hơn
                 this.executeCoinFlip,
                 this,
                 message,
@@ -28,44 +28,39 @@ module.exports = {
         const userId = message.author.id;
         const amount = parseInt(args[0]);
         if (isNaN(amount) || amount <= 0) {
-            return message.reply('❌ Số Rin phải là số dương!');
+            return message.reply('❌ Số dương!');
         }
         
-        const userRin = await getUserRin(userId);
-        if (userRin < amount) {
-            return message.reply('❌ Bạn không đủ Rin để cược!');
+        if (!(await FastUtils.canAfford(userId, amount))) {
+            return message.reply('❌ Không đủ Rin!');
         }
 
-        // Trừ tiền cược trước khi bắt đầu (tránh double spend)
-        await updateUserRin(userId, -amount);
+        // Trừ tiền cược nhanh
+        await FastUtils.updateFastUserRin(userId, -amount);
         
-        // Gửi hiệu ứng tung xu
+        // Animation nhanh hơn
         const animEmbed = new EmbedBuilder()
-            .setTitle('🪙 ĐANG TUNG XU...')
-            .setDescription(`Đang tung xu, chờ kết quả...\n\n💸 **Đã cược:** ${amount} Rin`)
+            .setTitle('🪙 TUNG XU...')
+            .setDescription(`💸 **Cược:** ${FastUtils.fastFormat(amount)} Rin`)
             .setColor('#AAAAAA');
         const sentMsg = await message.reply({ embeds: [animEmbed] });
         
         setTimeout(async () => {
-            const result = Math.random() < 0.45 ? 'win' : 'lose'; // 45% thắng, 55% thua
+            const result = Math.random() < 0.45 ? 'win' : 'lose';
             let desc = '';
             
             if (result === 'win') {
-                const winAmount = amount * 2; // Thắng gấp đôi
-                await updateUserRin(userId, winAmount);
-                desc = `🎉 **THẮNG!** 🪙\n💰 **Nhận được:** ${winAmount} Rin\n📈 **Lời:** ${amount} Rin`;
+                const winAmount = amount * 2;
+                await FastUtils.updateFastUserRin(userId, winAmount);
+                desc = `🎉 **THẮNG!** 🪙\n💰 **Nhận:** ${FastUtils.fastFormat(winAmount)} Rin\n📈 **Lời:** ${FastUtils.fastFormat(amount)} Rin`;
             } else {
-                desc = `😢 **THUA!** 🪙\n💸 **Mất:** ${amount} Rin`;
-                // Không cộng gì vì đã trừ tiền cược rồi
+                desc = `😢 **THUA!** 🪙\n💸 **Mất:** ${FastUtils.fastFormat(amount)} Rin`;
             }
             
-            const resultEmbed = new EmbedBuilder()
-                .setTitle('🪙 KẾT QUẢ TUNG XU')
+            await sentMsg.edit({ embeds: [new EmbedBuilder()
+                .setTitle('🪙 KẾT QUẢ')
                 .setDescription(desc)
-                .setColor(result === 'win' ? '#00FF00' : '#FF0000')
-                .setFooter({ text: 'Tỷ lệ thắng: 45% | Tỷ lệ thua: 55%' });
-                
-            await sentMsg.edit({ embeds: [resultEmbed] });
-        }, 1200);
+                .setColor(result === 'win' ? '#00FF00' : '#FF0000')] });
+        }, 800); // Giảm từ 1200ms xuống 800ms
     }
 }; 

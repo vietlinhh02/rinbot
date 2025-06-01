@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { TREE_VALUES, TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
 const AntiSpamManager = require('../../utils/antiSpam');
@@ -16,7 +16,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId, 
                 'muacay', 
-                3, // 3 giây cooldown
+                1, // Giảm cooldown
                 this.executeMuaCay,
                 this,
                 message,
@@ -44,9 +44,8 @@ module.exports = {
         }
 
         // Kiểm tra số Rin
-        const userRin = await getUserRin(userId);
-        if (userRin < 50) {
-            return message.reply('❌ Bạn cần ít nhất 50 Rin để mua hạt giống!');
+        if (!(await FastUtils.canAfford(userId, 50))) {
+            return message.reply('❌ Cần 50 Rin!');
         }
 
         // Random chọn cây
@@ -73,9 +72,8 @@ module.exports = {
         }
 
         // Kiểm tra số Rin
-        const userRin = await getUserRin(userId);
-        if (userRin < 50) {
-            const content = '❌ Bạn cần ít nhất 50 Rin để mua hạt giống!';
+        if (!(await FastUtils.canAfford(userId, 50))) {
+            const content = '❌ Cần 50 Rin!';
             if (isInteraction) {
                 return messageOrInteraction.reply({ content, ephemeral: true });
             } else {
@@ -84,7 +82,7 @@ module.exports = {
         }
 
         // Trừ tiền và tạo cây
-        await updateUserRin(userId, -50);
+        await FastUtils.updateFastUserRin(userId, -50);
         
         const newTree = new Tree({
             userId,

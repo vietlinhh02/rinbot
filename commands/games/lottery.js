@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const LotteryTicket = require('../../models/LotteryTicket');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const axios = require('axios');
 
 function getTodayStr() {
@@ -29,16 +29,16 @@ module.exports = {
         }
         // Kiểm tra số hợp lệ
         if (!args[0] || !/^[0-9]{5}$/.test(args[0])) {
-            return message.reply('❌ Bạn phải nhập đúng 5 số (vd: 12345)');
+            return message.reply('❌ Nhập đúng 5 số!');
         }
-        // Không kiểm tra đã mua, cho phép mua nhiều vé/ngày
-        // Kiểm tra tiền
-        const userRin = await getUserRin(userId);
-        if (userRin < 1000) {
-            return message.reply('❌ Bạn cần 1000 Rin để mua vé số!');
+        
+        // Kiểm tra tiền nhanh
+        if (!(await FastUtils.canAfford(userId, 1000))) {
+            return message.reply('❌ Cần 1000 Rin!');
         }
-        // Trừ tiền và lưu vé
-        await updateUserRin(userId, -1000);
+        
+        // Trừ tiền nhanh
+        await FastUtils.updateFastUserRin(userId, -1000);
         await LotteryTicket.create({ userId, soDuDoan: args[0], ngay: today });
         const embed = new EmbedBuilder()
             .setTitle('🎟️ ĐÃ MUA VÉ SỐ MIỀN BẮC')
@@ -74,8 +74,8 @@ module.exports = {
             else if (match === 3) reward = 5000;
             else if (match === 2) reward = 1000;
             if (reward > 0) {
-                await updateUserRin(ticket.userId, reward);
-                summary += `<@${ticket.userId}> (${soDuDoan}) trúng ${match} số cuối: +${reward} Rin\n`;
+                await FastUtils.updateFastUserRin(ticket.userId, reward);
+                summary += `<@${ticket.userId}> (${soDuDoan}) trúng ${match} số cuối: +${FastUtils.fastFormat(reward)} Rin\n`;
             }
             ticket.claimed = true;
             await ticket.save();

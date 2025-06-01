@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-const { getPet, updatePet, getUserRin, updateUserRin } = require('../../utils/database');
+const { getPet, updatePet } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { PET_IMAGES } = require('../../utils/constants');
 const AntiSpamManager = require('../../utils/antiSpam');
 
@@ -50,9 +51,8 @@ module.exports = {
             }
 
             // Kiểm tra số Rin
-            const userRin = await getUserRin(userId);
-            if (userRin < 20) {
-                return message.reply('❌ Bạn cần 20 Rin để mua thức ăn cho thú cưng!');
+            if (!(await FastUtils.canAfford(userId, 20))) {
+                return message.reply('❌ Cần 20 Rin!');
             }
 
             // Kiểm tra lại pet và tiền trước khi thực hiện (tránh race condition)
@@ -74,7 +74,7 @@ module.exports = {
             }
 
             // Trừ tiền và cho ăn
-            await updateUserRin(userId, -20);
+            await FastUtils.updateFastUserRin(userId, -20);
             
             // Random các hiệu ứng khi cho ăn
             const feedingResults = [

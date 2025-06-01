@@ -1,7 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-// Đảm bảo rằng các file này tồn tại ở đúng đường dẫn và export các hàm cần thiết
-const { getUserRin, updateUserRin } = require('../../utils/database'); // getUserRin(userId) -> Promise<number>, updateUserRin(userId, amount) -> Promise<void>
-const AntiSpamManager = require('../../utils/antiSpam'); // AntiSpamManager.executeWithProtection(userId, commandName, cooldownMs, functionToExecute, context, ...args)
+const FastUtils = require('../../utils/fastUtils'); // Fast cached database operations
+const AntiSpamManager = require('../../utils/antiSpam');
 
 // 5 loại biểu tượng với tỷ lệ thắng khác nhau
 const SYMBOLS = {
@@ -26,7 +25,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId,
                 'slot',
-                3, // Cooldown 3 giây (3000ms). Nếu AntiSpamManager của bạn dùng đơn vị giây, hãy đổi thành 3.
+                1, // Giảm cooldown xuống 1 giây để nhanh hơn
                 this.executeSlot, // Hàm sẽ được thực thi nếu không bị cooldown
                 this, // Ngữ cảnh (this) cho hàm executeSlot
                 message, // Các tham số tiếp theo sẽ được truyền vào executeSlot
@@ -51,13 +50,13 @@ module.exports = {
             return message.reply('❌ Cược tối thiểu 10 Rin!');
         }
 
-        const userRin = await getUserRin(userId);
-        if (userRin < amount) {
-            return message.reply('❌ Bạn không đủ Rin để chơi!');
+        // Fast check với cache
+        if (!(await FastUtils.canAfford(userId, amount))) {
+            return message.reply('❌ Không đủ Rin!');
         }
 
-        // Trừ tiền cược trước khi quay
-        await updateUserRin(userId, -amount);
+        // Trừ tiền cược nhanh
+        await FastUtils.updateFastUserRin(userId, -amount);
 
         // Tạo kết quả slot (mảng các key của SYMBOLS)
         const resultKeys = this.generateSlotResult();
@@ -124,21 +123,21 @@ module.exports = {
 
         const initialEmbed = new EmbedBuilder()
             .setTitle('🎰 SLOT MAY MẮN')
-            .setDescription(`| ❔ | ❔ | ❔ |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+            .setDescription(`| ❔ | ❔ | ❔ |\n\n💸 **Cược:** ${FastUtils.fastFormat(amount)} Rin`)
             .setColor('#FFD700') // Gold
             .setFooter({ text: 'Đang khởi động...' });
         const sentMsg = await message.reply({ embeds: [initialEmbed] });
 
-        const updateDelay = 300; // Thời gian chờ giữa các frame (ms), tăng nếu animation giật
-        const initialSpinFrames = 5; // Số frame cho lần quay đầu
-        const secondSpinFrames = 4;  // Số frame cho lần quay thứ hai
-        const thirdSpinFrames = 3;   // Số frame cho lần quay cuối
+        const updateDelay = 180; // Nhanh hơn 40%
+        const initialSpinFrames = 3; // Giảm frames
+        const secondSpinFrames = 2;  
+        const thirdSpinFrames = 2;
 
         // Hàm trợ giúp tạo Embed cho animation
         const createSpinEmbed = (s1, s2, s3, footerText, color) => {
             return new EmbedBuilder()
                 .setTitle('🎰 SLOT MAY MẮN')
-                .setDescription(`| ${s1} | ${s2} | ${s3} |\n\n💸 **Đặt cược:** ${amount.toLocaleString()} Rin`)
+                .setDescription(`| ${s1} | ${s2} | ${s3} |\n\n💸 **Cược:** ${FastUtils.fastFormat(amount)} Rin`)
                 .setColor(color)
                 .setFooter({ text: footerText });
         };
@@ -162,24 +161,24 @@ module.exports = {
                 animationIcons[(frame + initialSpinFrames + 1 + Math.floor(Math.random() * animationIcons.length)) % animationIcons.length]
             ];
             await sentMsg.edit({ embeds: [createSpinEmbed(iconsToDisplay[0], iconsToDisplay[1], iconsToDisplay[2], '🔒 Slot 1 dừng!', '#FFB347')] }); // Orange
-            await this.sleep(updateDelay + 50); // Chậm hơn một chút
+            await this.sleep(updateDelay + 20);
         }
 
         // Phase 3: Slot 1 & 2 dừng, slot 3 tiếp tục quay
         for (let frame = 0; frame < thirdSpinFrames; frame++) {
             const iconsToDisplay = [
-                finalDisplayedIcons.slot1, // Slot 1 dừng
-                finalDisplayedIcons.slot2, // Slot 2 dừng
+                finalDisplayedIcons.slot1, 
+                finalDisplayedIcons.slot2, 
                 animationIcons[(frame + initialSpinFrames + secondSpinFrames + Math.floor(Math.random() * animationIcons.length)) % animationIcons.length]
             ];
-            await sentMsg.edit({ embeds: [createSpinEmbed(iconsToDisplay[0], iconsToDisplay[1], iconsToDisplay[2], '🔒 Slot 2 dừng!', '#FF8C69')] }); // Salmon
-            await this.sleep(updateDelay + 100); // Chậm hơn nữa
+            await sentMsg.edit({ embeds: [createSpinEmbed(iconsToDisplay[0], iconsToDisplay[1], iconsToDisplay[2], '🔒 Slot 2 dừng!', '#FF8C69')] });
+            await this.sleep(updateDelay + 40);
         }
 
-        // Phase 4: Tất cả dừng, hiển thị kết quả cuối cùng trước khi thông báo thắng/thua
+        // Phase 4: Kết quả cuối
         const finalIconsArray = [finalDisplayedIcons.slot1, finalDisplayedIcons.slot2, finalDisplayedIcons.slot3];
-        await sentMsg.edit({ embeds: [createSpinEmbed(finalIconsArray[0], finalIconsArray[1], finalIconsArray[2], '🔒 Tất cả dừng!', '#DC143C')] }); // Crimson
-        await this.sleep(700); // Chờ một chút để người dùng thấy kết quả cuối
+        await sentMsg.edit({ embeds: [createSpinEmbed(finalIconsArray[0], finalIconsArray[1], finalIconsArray[2], '⭐ Kết quả!', '#DC143C')] });
+        await this.sleep(300); // Giảm từ 700ms xuống 300ms
 
         // Tính toán và hiển thị kết quả thắng/thua
         await this.showFinalResult(sentMsg, amount, finalResultKeys, finalIconsArray, message.author.id);
@@ -188,7 +187,7 @@ module.exports = {
     async showFinalResult(sentMsg, amount, finalResultKeys, displayedIcons, userId) {
         const isWin = finalResultKeys[0] === finalResultKeys[1] && finalResultKeys[1] === finalResultKeys[2];
         let description = `| ${displayedIcons.join(' | ')} |\n\n`;
-        description += `💸 **Đặt cược:** ${amount.toLocaleString()} Rin\n`;
+        description += `💸 **Cược:** ${FastUtils.fastFormat(amount)} Rin\n`;
 
         if (isWin) {
             const symbolKey = finalResultKeys[0]; // Nếu thắng, cả 3 key giống nhau
@@ -201,7 +200,7 @@ module.exports = {
             // Ví dụ: cược 10, userRin -= 10. Thắng x2 (20), userRin += 20. Tổng cộng userRin += 10.
             // Hoà vốn x1 (10), userRin += 10. Tổng cộng userRin không đổi.
             if (winAmount > 0) { // Chỉ cập nhật nếu có tiền thắng (đề phòng multiplier 0)
-                await updateUserRin(userId, winAmount);
+                await FastUtils.updateFastUserRin(userId, winAmount);
             }
 
             let rarityText = '';
@@ -214,31 +213,29 @@ module.exports = {
             else if (multiplier === 1.0) { rarityText = '🥉 **HOÀ VỐN!**'; embedColor = '#F59E0B'; }      // Breakeven Amber
 
             description += `\n🎉 ${rarityText}\n`;
-            description += `💰 **Nhận được:** ${winAmount.toLocaleString()} Rin\n`;
+            description += `💰 **Nhận:** ${FastUtils.fastFormat(winAmount)} Rin\n`;
             if (profit > 0) {
-                description += `📈 **Lời:** +${profit.toLocaleString()} Rin\n`;
+                description += `📈 **Lời:** +${FastUtils.fastFormat(profit)} Rin\n`;
             } else if (profit === 0 && multiplier === 1.0) {
-                description += `⚖️ **Hoà vốn:** 0 Rin\n`;
+                description += `⚖️ **Hoà vốn**\n`;
             }
-            // Không có trường hợp profit < 0 ở đây vì isWin = true và multiplier >= 1.0
-            description += `🔥 **Hệ số:** x${multiplier.toFixed(1)}`;
+            description += `🔥 **x${multiplier.toFixed(1)}**`;
 
             const resultEmbed = new EmbedBuilder()
-                .setTitle('🎰 CHÚC MỪNG THẮNG LỚN!')
+                .setTitle('🎰 THẮNG!')
                 .setDescription(description)
                 .setColor(embedColor);
             await sentMsg.edit({ embeds: [resultEmbed] });
 
         } else {
             // Người chơi thua, tiền cược đã được trừ ở executeSlot, không cần làm gì thêm với database
-            description += `\n😢 **RẤT TIẾC, BẠN KHÔNG TRÚNG!**\n`;
-            description += `💸 **Mất:** ${amount.toLocaleString()} Rin`;
+            description += `\n😢 **THUA!**\n`;
+            description += `💸 **Mất:** ${FastUtils.fastFormat(amount)} Rin`;
 
-            const resultEmbed = new EmbedBuilder()
-                .setTitle('🎰 CHÚC BẠN MAY MẮN LẦN SAU!')
+            await sentMsg.edit({ embeds: [new EmbedBuilder()
+                .setTitle('🎰 THUA!')
                 .setDescription(description)
-                .setColor('#EF4444'); // Red for loss
-            await sentMsg.edit({ embeds: [resultEmbed] });
+                .setColor('#EF4444')] });
         }
     },
 

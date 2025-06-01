@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { getUserRin, updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const User = require('../../models/User');
 const AntiSpamManager = require('../../utils/antiSpam');
 
@@ -14,7 +14,7 @@ module.exports = {
             await AntiSpamManager.executeWithProtection(
                 userId, 
                 'rindaily', 
-                5, // 5 giây cooldown
+                2, // Giảm cooldown
                 this.executeRinDaily,
                 this,
                 message,
@@ -63,14 +63,14 @@ module.exports = {
             }
 
             const reward = Math.floor(Math.random() * 151) + 50; // 50-200 Rin
-            await updateUserRin(userId, reward);
+            await FastUtils.updateFastUserRin(userId, reward);
             
             freshUser.lastDaily = now;
             await freshUser.save();
 
             const embed = new EmbedBuilder()
-                .setTitle('🎁 Nhận thưởng hàng ngày!')
-                .setDescription(`${message.author}, bạn nhận được **${reward} Rin**!`)
+                .setTitle('🎁 Daily!')
+                .setDescription(`${message.author}, nhận **${FastUtils.fastFormat(reward)} Rin**!`)
                 .setColor('#00FF00');
 
             await message.reply({ embeds: [embed] });

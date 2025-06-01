@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { updateUserRin } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 const { TREE_VALUES, TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
 
@@ -147,7 +147,7 @@ module.exports = {
         const profit = sellPrice - totalCost;
 
         // Thực hiện bán cây
-        await updateUserRin(userId, sellPrice);
+        await FastUtils.updateFastUserRin(userId, sellPrice);
         await Tree.deleteOne({ _id: tree._id });
 
         // Đếm số cây còn lại

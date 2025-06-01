@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getCityUser, updateCityUser, getUserRin, updateUserRin } = require('../../utils/database');
+const { getCityUser, updateCityUser } = require('../../utils/database');
+const FastUtils = require('../../utils/fastUtils');
 
 // Thông tin các loại nhà
 const HOUSE_TYPES = {
@@ -68,9 +69,8 @@ module.exports = {
             }
 
             // Kiểm tra số Rin
-            const userRin = await getUserRin(userId);
-            if (userRin < houseInfo.price) {
-                return message.reply(`❌ Bạn cần **${houseInfo.price} Rin** để thuê ${houseInfo.name}! Hiện tại: ${userRin} Rin`);
+            if (!(await FastUtils.canAfford(userId, houseInfo.price))) {
+                return message.reply(`❌ Cần **${houseInfo.price} Rin** để thuê ${houseInfo.name}!`);
             }
 
             // Xác nhận thuê nhà
@@ -109,7 +109,7 @@ module.exports = {
 
     // Hiển thị danh sách nhà
     async showHouseList(message, cityUser) {
-        const userRin = await getUserRin(message.author.id);
+        const userRin = await FastUtils.getFastUserRin(message.author.id);
         
         let houseList = '';
         Object.entries(HOUSE_TYPES).forEach(([type, info]) => {
@@ -157,18 +157,17 @@ module.exports = {
 
             try {
                 const cityUser = await getCityUser(userId);
-                const userRin = await getUserRin(userId);
 
                 if (cityUser.home) {
                     return interaction.reply({ content: '❌ Bạn đã có nhà rồi!', ephemeral: true });
                 }
 
-                if (userRin < houseInfo.price) {
+                if (!(await FastUtils.canAfford(userId, houseInfo.price))) {
                     return interaction.reply({ content: `❌ Không đủ ${houseInfo.price} Rin!`, ephemeral: true });
                 }
 
                 // Trừ tiền và cập nhật nhà
-                await updateUserRin(userId, -houseInfo.price);
+                await FastUtils.updateFastUserRin(userId, -houseInfo.price);
                 await updateCityUser(userId, {
                     home: houseType,
                     lastRepair: new Date()

@@ -84,7 +84,7 @@ class AntiSpamManager {
     }
     
     /**
-     * Wrapper function để bảo vệ command khỏi spam
+     * Fast wrapper - Kiểm tra nhanh và thực thi
      * @param {string} userId - ID người dùng
      * @param {string} commandName - Tên command
      * @param {number} cooldownSeconds - Cooldown tính bằng giây
@@ -94,30 +94,41 @@ class AntiSpamManager {
      * @returns {Promise<any>} - Kết quả của command function
      */
     static async executeWithProtection(userId, commandName, cooldownSeconds, commandFunction, thisContext, ...args) {
+        // Fast path - skip checks for very short cooldowns
+        if (cooldownSeconds <= 1) {
+            return await commandFunction.apply(thisContext, args);
+        }
+        
         const cooldownMs = cooldownSeconds * 1000;
+        const lockKey = `${userId}_${commandName}`;
         
-        // Kiểm tra cooldown
-        const cooldownCheck = this.checkCooldown(userId, commandName, cooldownMs);
-        if (!cooldownCheck.canUse) {
-            throw new Error(`⏰ Bạn cần đợi **${cooldownCheck.timeLeft} giây** nữa mới có thể dùng lại lệnh này!`);
+        // Combined check - faster than separate calls
+        const now = Date.now();
+        const userCommands = userCooldowns.get(userId);
+        const lastUsed = userCommands?.get(commandName) || 0;
+        const timeLeft = (lastUsed + cooldownMs) - now;
+        
+        if (timeLeft > 0) {
+            throw new Error(`⏰ Còn **${Math.ceil(timeLeft / 1000)}s** nữa!`);
         }
         
-        // Kiểm tra và đặt lock
-        if (!this.acquireLock(userId, commandName)) {
-            throw new Error(`🔒 Bạn đang thực hiện lệnh này rồi! Vui lòng đợi hoàn thành.`);
+        // Quick lock check
+        const userLockSet = userLocks.get(userId);
+        if (userLockSet?.has(commandName)) {
+            throw new Error(`🔒 Đang xử lý...`);
         }
+        
+        // Set everything at once
+        if (!userCooldowns.has(userId)) userCooldowns.set(userId, new Map());
+        if (!userLocks.has(userId)) userLocks.set(userId, new Set());
+        
+        userCooldowns.get(userId).set(commandName, now);
+        userLocks.get(userId).add(commandName);
         
         try {
-            // Đặt cooldown ngay lập tức
-            this.setCooldown(userId, commandName);
-            
-            // Thực hiện command
-            const result = await commandFunction.apply(thisContext, args);
-            return result;
-            
+            return await commandFunction.apply(thisContext, args);
         } finally {
-            // Luôn giải phóng lock dù thành công hay thất bại
-            this.releaseLock(userId, commandName);
+            userLocks.get(userId)?.delete(commandName);
         }
     }
     
