@@ -69,6 +69,7 @@ module.exports = {
             }
 
             // Tạo lời mời ghép cặp
+            const expiresAt = Date.now() + 60000; // 1 phút
             const invitationId = `${userId}_${targetUser.id}_${Date.now()}`;
             breedingInvitations.set(invitationId, {
                 sender: message.author,
@@ -76,10 +77,8 @@ module.exports = {
                 pet1: pet,
                 pet2: targetPet,
                 channelId: message.channel.id,
-                expiresAt: expiresAt
+                expiresAt: expiresAt 
             });
-
-            const expiresAt = Date.now() + 60000; // 1 phút
             const embed = new EmbedBuilder()
                 .setTitle('💕 LỜI MỜI GHÉP CẶP THÚ CƯNG')
                 .setDescription(`**${message.author.displayName}** muốn ghép cặp thú cưng với **${targetUser.displayName}**!\n\n` +
