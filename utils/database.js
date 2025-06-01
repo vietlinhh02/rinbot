@@ -157,6 +157,15 @@ const updateCityUser = async (userId, updateData) => {
     }
 };
 
+const updateAllCityUsers = async (filter, updateData) => {
+    try {
+        return await CityUser.updateMany(filter, updateData);
+    } catch (error) {
+        console.error('Lỗi updateAllCityUsers:', error);
+        return null;
+    }
+};
+
 // Guild functions
 const getGuildPrefix = async (guildId) => {
     try {
@@ -215,6 +224,7 @@ module.exports = {
     deleteTree,
     getCityUser,
     updateCityUser,
+    updateAllCityUsers,
     getGuildPrefix,
     setGuildPrefix,
     getAllGuildPrefixes

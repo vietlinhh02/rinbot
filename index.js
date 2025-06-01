@@ -823,15 +823,36 @@ const setupCronJobs = () => {
         }
     });
 
-    // Kiểm tra sửa nhà mỗi ngày
+    // Reset MC và Nhà báo mỗi ngày vào 0:00
     cron.schedule('0 0 * * *', async () => {
         try {
+            const { updateAllCityUsers } = require('./utils/database');
+            
+            // Reset các trạng thái làm việc hàng ngày
+            await updateAllCityUsers({
+                $or: [
+                    { job: 'mc' },
+                    { job: 'nhabao' }
+                ]
+            }, {
+                $unset: {
+                    lastWork: "",
+                    workStartTime: "",
+                    dailyVoiceMinutes: "",
+                    workProgress: "",
+                    dailyMoneySteal: ""
+                }
+            });
+            
+            console.log('🌅 Đã reset công việc MC và Nhà báo cho ngày mới!');
+            
+            // Kiểm tra sửa nhà
             const cityHandler = require('./commands/city/city.js');
             if (cityHandler.checkRepair) {
                 await cityHandler.checkRepair(client);
             }
         } catch (error) {
-            console.error('Lỗi kiểm tra sửa nhà:', error);
+            console.error('Lỗi reset công việc hàng ngày:', error);
         }
     });
 

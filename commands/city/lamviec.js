@@ -343,7 +343,7 @@ module.exports = {
             const hoursLeft = Math.floor(timeUntilTomorrow / (60 * 60 * 1000));
             const minutesLeft = Math.floor((timeUntilTomorrow % (60 * 60 * 1000)) / (60 * 1000));
             
-            return message.reply(`✅ Bạn đã hoàn thành ca làm MC hôm nay!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)`);
+            return message.reply(`✅ Bạn đã hoàn thành ca làm MC hôm nay!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)\n\n💡 **Lưu ý:** Mỗi ngày chỉ được làm MC 1 lần duy nhất!`);
         }
         
         // Chỉ xử lý nghề MC - Voice
@@ -379,7 +379,7 @@ module.exports = {
                 `**⏰ Thời gian:**\n` +
                 `• **Session hiện tại:** ${sessionMinutes} phút\n` +
                 `• **Tích lũy hôm nay:** ${actualProgress} phút\n` +
-                `• **Giới hạn:** 1 lần/ngày (reset 0:00)\n\n` +
+                `• **Giới hạn:** 1 lần/ngày (reset 0:00 tự động)\n\n` +
                 `**📍 Trạng thái Voice:**\n` +
                 `• **Hiện tại:** ${isInVoice ? `🟢 Đang ở ${member.voice.channel.name}` : '🔴 Không ở voice'}\n` +
                 `${lastJoin && !hasWorkedToday ? `• **Bắt đầu session:** ${lastJoin.toLocaleTimeString('vi-VN')}\n` : ''}` +
@@ -418,7 +418,7 @@ module.exports = {
             const hoursLeft = Math.floor(timeUntilTomorrow / (60 * 60 * 1000));
             const minutesLeft = Math.floor((timeUntilTomorrow % (60 * 60 * 1000)) / (60 * 1000));
             
-            return message.reply(`✅ Bạn đã hoàn thành ca làm Nhà báo hôm nay!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)`);
+            return message.reply(`✅ Bạn đã hoàn thành ca làm Nhà báo hôm nay!\n⏰ Có thể làm việc lại sau: **${hoursLeft}h ${minutesLeft}p** nữa (0:00 ngày mai)\n\n💡 **Lưu ý:** Mỗi ngày chỉ được làm Nhà báo 1 lần duy nhất!`);
         }
         
         if (!isWorking) {
