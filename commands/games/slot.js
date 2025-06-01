@@ -73,9 +73,9 @@ module.exports = {
             }
         });
 
-        // Random 3 slot - 40% thua / 60% thắng
+        // Random 3 slot - 20% thua / 80% thắng
         let slots = [];
-        const houseBias = Math.random() < 0.40; // 40% bias về thua
+        const houseBias = Math.random() < 0.20; // 20% bias về thua
 
         if (houseBias) {
             // Tạo 3 slot khác nhau để thua (house edge)
@@ -89,17 +89,17 @@ module.exports = {
                 slots.push(key);
             }
         } else {
-            // 60% cơ hội có thể thắng (3 giống nhau)
+            // 80% cơ hội có thể thắng (3 giống nhau)
             const winChance = Math.random();
-            if (winChance < 0.50) { // 50% trong 60% = 30% tổng thể cho x1 (hoà vốn)
+            if (winChance < 0.50) { // 50% trong 80% = 40% tổng thể cho x1 (hoà vốn)
                 slots = ['breakeven', 'breakeven', 'breakeven'];
-            } else if (winChance < 0.85) { // 35% trong 60% = 21% cho x2 
+            } else if (winChance < 0.90) { // 40% trong 80% = 32% cho x2 
                 slots = ['common', 'common', 'common'];
-            } else if (winChance < 0.95) { // 10% trong 60% = 6% cho x2.5
+            } else if (winChance < 0.965) { // 6.5% trong 80% = 5.2% cho x2.5
                 slots = ['uncommon', 'uncommon', 'uncommon'];
-            } else if (winChance < 0.99) { // 4% trong 60% = 2.4% cho x4
+            } else if (winChance < 0.995) { // 3% trong 80% = 2.4% cho x4
                 slots = ['rare', 'rare', 'rare'];
-            } else { // 1% trong 60% = 0.6% cho x7 (cực hiếm)
+            } else { // 0.5% trong 80% = 0.4% cho x7 (cực hiếm)
                 slots = ['epic', 'epic', 'epic'];
             }
         }
