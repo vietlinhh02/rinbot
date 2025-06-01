@@ -87,8 +87,6 @@ module.exports = {
             const expiresAt = Date.now() + 60000; // 1 phút
             const invitationId = `${userId}_${targetUser.id}_${Date.now()}`;
             
-            console.log(`Debug petchich create: Current: ${Date.now()}, ExpiresAt: ${expiresAt}, Duration: 60000ms`);
-            
             breedingInvitations.set(invitationId, {
                 sender: message.author,
                 target: targetUser,
@@ -97,10 +95,6 @@ module.exports = {
                 channelId: message.channel.id,
                 expiresAt: expiresAt 
             });
-            
-            // Verify invitation was saved correctly
-            const savedInvitation = breedingInvitations.get(invitationId);
-            console.log(`Debug verify save: ${invitationId} saved with expiresAt: ${savedInvitation?.expiresAt}`);
             const embed = new EmbedBuilder()
                 .setTitle('💕 LỜI MỜI GHÉP CẶP THÚ CƯNG')
                 .setDescription(`**${message.author.displayName}** muốn ghép cặp thú cưng với **${targetUser.displayName}**!\n\n` +
@@ -133,10 +127,8 @@ module.exports = {
 
             // Tự động xóa lời mời sau 1 phút
             const timeoutDuration = expiresAt - Date.now();
-            console.log(`Debug timeout: Setting timeout for ${timeoutDuration}ms`);
             
             setTimeout(() => {
-                console.log(`Debug timeout: Deleting invitation ${invitationId} after timeout`);
                 breedingInvitations.delete(invitationId);
             }, timeoutDuration);
 
@@ -154,14 +146,10 @@ module.exports = {
         const freshPet1 = await getPet(pet1.userId);
         const freshPet2 = await getPet(targetUser.id);
         
-        console.log(`Debug breeding: Fresh Pet1 lastBred: ${freshPet1?.lastBred}, Fresh Pet2 lastBred: ${freshPet2?.lastBred}`);
-        
         // Kiểm tra cooldown breeding (24 giờ) cho CẢ HAI thú cưng
-        console.log(`Debug breeding: Pet1 lastBred: ${freshPet1?.lastBred}, Pet2 lastBred: ${freshPet2?.lastBred}`);
         
         if (freshPet1?.lastBred) {
             const hoursSinceLastBred1 = (now - new Date(freshPet1.lastBred)) / (1000 * 60 * 60);
-            console.log(`Debug breeding: Pet1 hours since last bred: ${hoursSinceLastBred1}`);
             if (hoursSinceLastBred1 < 24) {
                 const remainingHours = Math.ceil(24 - hoursSinceLastBred1);
                 return message.reply(`⏰ Thú cưng của ${message.author.displayName} vẫn đang nghỉ ngơi sau lần sinh sản trước! Hãy quay lại sau **${remainingHours} giờ**.`);
@@ -170,7 +158,6 @@ module.exports = {
         
         if (freshPet2?.lastBred) {
             const hoursSinceLastBred2 = (now - new Date(freshPet2.lastBred)) / (1000 * 60 * 60);
-            console.log(`Debug breeding: Pet2 hours since last bred: ${hoursSinceLastBred2}`);
             if (hoursSinceLastBred2 < 24) {
                 const remainingHours = Math.ceil(24 - hoursSinceLastBred2);
                 return message.reply(`⏰ Thú cưng của ${targetUser.displayName} vẫn đang nghỉ ngơi sau lần sinh sản trước! Hãy quay lại sau **${remainingHours} giờ**.`);
@@ -192,10 +179,17 @@ module.exports = {
 
         const isSuccess = Math.random() < successRate;
 
-        // Cập nhật lastBred cho cả hai thú
-        console.log(`Debug breeding: Updating lastBred to ${now} for both pets`);
-        await updatePet(pet1.userId, { lastBred: now });
-        await updatePet(targetUser.id, { lastBred: now });
+        // Cập nhật lastBred cho cả hai thú  
+        try {
+            await updatePet(pet1.userId, { lastBred: now });
+            await updatePet(targetUser.id, { lastBred: now });
+            
+            console.log(`✅ Breeding cooldown set: 24h for both pets`);
+            
+        } catch (error) {
+            console.error('❌ Error updating pet lastBred:', error);
+            return message.reply('❌ Có lỗi khi cập nhật thông tin thú cưng! Vui lòng thử lại.');
+        }
 
         if (isSuccess) {
             // Sinh sản thành công
@@ -260,8 +254,6 @@ module.exports = {
         const result = parts[1]; // 'accept' hoặc 'reject'
         const invitationId = parts.slice(2).join('_'); // Ghép lại phần còn lại vì có thể có dấu _ trong ID
         
-        console.log(`Debug handleInteraction: CustomId: ${interaction.customId}, InvitationId: ${invitationId}`);
-        
         const invitation = breedingInvitations.get(invitationId);
 
         if (!invitation) {
@@ -270,13 +262,10 @@ module.exports = {
 
         // Kiểm tra thời gian hết hạn chính xác
         const currentTime = Date.now();
-        const timeLeft = invitation.expiresAt - currentTime;
-        
-        console.log(`Debug petchich: Current: ${currentTime}, Expires: ${invitation.expiresAt}, Time left: ${timeLeft}ms`);
         
         if (currentTime > invitation.expiresAt) {
             breedingInvitations.delete(invitationId);
-            return interaction.reply({ content: `❌ Lời mời đã hết hạn! (Hết hạn ${Math.abs(timeLeft)}ms trước)`, flags: 64 });
+            return interaction.reply({ content: '❌ Lời mời đã hết hạn!', flags: 64 });
         }
 
         if (interaction.user.id !== invitation.target.id) {
