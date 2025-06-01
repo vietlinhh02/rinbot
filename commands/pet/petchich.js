@@ -11,6 +11,14 @@ module.exports = {
     
     async execute(message, args) {
         try {
+            // Clean up các lời mời hết hạn
+            const now = Date.now();
+            for (const [inviteId, invitation] of breedingInvitations.entries()) {
+                if (now > invitation.expiresAt) {
+                    breedingInvitations.delete(inviteId);
+                }
+            }
+
             const userId = message.author.id;
             const pet = await getPet(userId);
             
@@ -68,9 +76,10 @@ module.exports = {
                 pet1: pet,
                 pet2: targetPet,
                 channelId: message.channel.id,
-                expiresAt: Date.now() + 60000 // 1 phút
+                expiresAt: expiresAt
             });
 
+            const expiresAt = Date.now() + 60000; // 1 phút
             const embed = new EmbedBuilder()
                 .setTitle('💕 LỜI MỜI GHÉP CẶP THÚ CƯNG')
                 .setDescription(`**${message.author.displayName}** muốn ghép cặp thú cưng với **${targetUser.displayName}**!\n\n` +
@@ -81,7 +90,8 @@ module.exports = {
                     `• Hai thú cưng sẽ kết hôn\n` +
                     `• Có cơ hội sinh con và nhận thưởng\n` +
                     `• Có thể tiếp tục ghép cặp trong tương lai\n\n` +
-                    `${targetUser}, bạn có đồng ý không?`)
+                    `${targetUser}, bạn có đồng ý không?\n` +
+                    `⏰ **Hết hạn vào:** <t:${Math.floor(expiresAt/1000)}:R>`)
                 .setColor('#FF69B4')
                 .setFooter({ text: 'Lời mời sẽ hết hạn sau 60 giây' })
                 .setTimestamp();
@@ -103,7 +113,7 @@ module.exports = {
             // Tự động xóa lời mời sau 1 phút
             setTimeout(() => {
                 breedingInvitations.delete(invitationId);
-            }, 60000);
+            }, expiresAt - Date.now());
 
         } catch (error) {
             console.error('Lỗi petchich:', error);
@@ -202,6 +212,12 @@ module.exports = {
         const invitation = breedingInvitations.get(invitationId);
 
         if (!invitation) {
+            return interaction.reply({ content: '❌ Lời mời đã hết hạn!', ephemeral: true });
+        }
+
+        // Kiểm tra thời gian hết hạn chính xác
+        if (Date.now() > invitation.expiresAt) {
+            breedingInvitations.delete(invitationId);
             return interaction.reply({ content: '❌ Lời mời đã hết hạn!', ephemeral: true });
         }
 
