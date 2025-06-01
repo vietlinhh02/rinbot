@@ -20,11 +20,11 @@ module.exports = {
         let slots = ['❔', '❔', '❔'];
         let jackpot = false, twoMatch = false;
         // Xác suất 3 giống nhau: 15%
-        if (Math.random() < 0.20) {
+        if (Math.random() < 0.10) {
             const symbol = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
             slots = [symbol, symbol, symbol];
             jackpot = true;
-        } else if (Math.random() < 0.45) { // Xác suất 2 giống nhau: 35%
+        } else if (Math.random() < 0.35) { // Xác suất 2 giống nhau: 35%
             const symbol = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
             const other = SYMBOLS.filter(s => s !== symbol)[Math.floor(Math.random() * (SYMBOLS.length-1))];
             // Random vị trí 2 giống nhau
