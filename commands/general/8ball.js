@@ -40,6 +40,11 @@ module.exports = {
                 '✅ **Có!**',
                 '✅ **Tất nhiên rồi!**',
                 '✅ **Dấu hiệu cho thấy có!**',
+                '✅ **100% chắc chắn!**',
+                '✅ **Đúng vậy, cứ tin tôi!**',
+                '✅ **May mắn đang mỉm cười với bạn!**',
+                '✅ **Tôi thấy tương lai tươi sáng!**',
+                '✅ **Cơ hội thành công rất cao!**',
                 
                 // Trung tính
                 '🤔 **Hãy hỏi lại sau...**',
@@ -49,6 +54,11 @@ module.exports = {
                 '🤔 **Đừng tin vào điều đó.**',
                 '🤔 **Câu trả lời mơ hồ, hãy thử lại.**',
                 '🤔 **Hỏi lại sau nhé.**',
+                '🤔 **Khó nói lắm...**',
+                '🤔 **50-50 thôi!**',
+                '🤔 **Tùy vào vận may của bạn.**',
+                '🤔 **Có thể có, có thể không.**',
+                '🤔 **Tôi cũng không chắc lắm.**',
                 
                 // Tiêu cực
                 '❌ **Đừng hy vọng vào điều đó.**',
@@ -58,6 +68,10 @@ module.exports = {
                 '❌ **Rất nghi ngờ.**',
                 '❌ **Không!**',
                 '❌ **Chắc chắn là không!**',
+                '❌ **Đừng mơ nữa!**',
+                '❌ **Tôi thấy đường tối tăm phía trước.**',
+                '❌ **Bỏ ý tưởng đó đi!**',
+                '❌ **Không có cửa!**',
                 
                 // Hài hước (dành riêng cho tiếng Việt)
                 '😄 **Hỏi mẹ bạn đi!**',
@@ -68,6 +82,30 @@ module.exports = {
                 '🎲 **Tung đồng xu cho chắc!**',
                 '🎭 **Phải xem ngày tốt xấu mới biết!**',
                 '🌟 **Nhìn các vì sao đã sắp xếp...**',
+                '😄 **Hỏi bà thầy bói đi!**',
+                '😄 **Tôi đang nghỉ, hỏi lại sau!**',
+                '😄 **Wifi tôi lag, không thấy rõ!**',
+                '😄 **Bạn có chắc muốn biết không?**',
+                '😄 **Đến cả tôi cũng bối rối!**',
+                '😄 **Hỏi thằng bạn thân xem!**',
+                '😄 **Câu hỏi hay, nhưng tôi không biết!**',
+                '😄 **Đi tìm thầy cúng đi bạn ơi!**',
+                '😄 **Hình như... à quên rồi!**',
+                '😄 **Bói được thì tôi giàu rồi!**',
+                '😄 **Thôi đi làm việc khác đi!**',
+                '😄 **Hỏi AI khác xem sao!**',
+                '😄 **Để tôi lắc lắc cái... xong!**',
+                '😄 **Tôi chỉ biết bói thôi, không phải thần!**',
+                
+                // Câu nói Việt Nam đặc trưng
+                '🇻🇳 **Trời sinh voi, trời sinh cỏ!**',
+                '🇻🇳 **Có thần linh phù hộ!**',
+                '🇻🇳 **Chớ có lo, mọi chuyện sẽ ổn!**',
+                '🇻🇳 **Số phận đã định sẵn rồi!**',
+                '🇻🇳 **Trong cái rủi có cái may!**',
+                '🇻🇳 **Đi một ngày đàng học một sàng khôn!**',
+                '🇻🇳 **Có công mài sắt có ngày nên kim!**',
+                '🇻🇳 **Thuận thiên giả tồn, nghịch thiên giả vong!**',
             ];
             
             const randomResponse = responses[Math.floor(Math.random() * responses.length)];
