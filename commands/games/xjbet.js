@@ -1,10 +1,30 @@
 const { EmbedBuilder } = require('discord.js');
 const { getUserRin, updateUserRin } = require('../../utils/database');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
     name: 'xjbet',
     description: 'Tham gia bàn Xì Dách với số tiền tùy chọn',
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 2 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'xjbet', 
+                2, // 2 giây cooldown
+                this.executeXJBet,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+
+    async executeXJBet(message, args) {
         try {
             const channelId = String(message.channel.id);
             const betAmount = parseInt(args[0]);

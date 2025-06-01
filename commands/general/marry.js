@@ -1,6 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const User = require('../../models/User');
 const { getPrefix } = require('../../utils/prefixHelper');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 // Định nghĩa thông tin nhẫn
 const RING_INFO = {
@@ -31,6 +32,25 @@ module.exports = {
     name: 'marry',
     description: 'Kết hôn với ai đó bằng nhẫn',
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 5 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'marry', 
+                5, // 5 giây cooldown
+                this.executeMarry,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+
+    async executeMarry(message, args) {
         try {
             const prefix = await getPrefix(message.guild?.id);
             const userId = message.author.id;

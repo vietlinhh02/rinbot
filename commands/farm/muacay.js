@@ -2,6 +2,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { getUserRin, updateUserRin } = require('../../utils/database');
 const { TREE_VALUES, TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
     name: 'muacay',
@@ -10,7 +11,26 @@ module.exports = {
     async execute(message, args) {
         const userId = message.author.id;
         
-        // Kiểm tra số cây hiện có (giới hạn 1 cây)
+        try {
+            // Bảo vệ command khỏi spam với cooldown 3 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'muacay', 
+                3, // 3 giây cooldown
+                this.executeMuaCay,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+    
+    async executeMuaCay(message, args) {
+        const userId = message.author.id;
+        
+        // Kiểm tra số cây hiện có (giới hạn 1 cây) - Double check tránh spam
         const existingTrees = await Tree.find({ userId, guildId: message.guild.id });
         const maxTrees = 1;
         if (existingTrees.length >= maxTrees) {
@@ -20,7 +40,7 @@ module.exports = {
                 const stage = stageNames[tree.growthStage] || '🌱';
                 treeList += `${index + 1}. ${stage} **${tree.species}** (${tree.waterCount} lần tưới)\n`;
             });
-            return message.reply(`❌ Bạn chỉ được trồng 1 cây!\n\n**🌱 Cây hiện có:**\n${treeList}\n💡 Hãy thu hoạch hoặc bán cây để trồng mới.`);
+            return message.reply(`❌ Bạn chỉ được trồng 1 cây! (Phát hiện spam)\n\n**🌱 Cây hiện có:**\n${treeList}\n💡 Hãy thu hoạch hoặc bán cây để trồng mới.`);
         }
 
         // Kiểm tra số Rin

@@ -1,12 +1,32 @@
 const { EmbedBuilder } = require('discord.js');
 const { TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
     name: 'tuoicay',
     description: 'Tưới nước cho cây (mỗi 30 phút). Mỗi cây chỉ cần 3 lần tưới, sau khi đủ 3 lần tưới hoặc bón phân thì chờ 1 tiếng để thu hoạch. Mỗi người chỉ được 1 cây.',
     
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 2 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'tuoicay', 
+                2, // 2 giây cooldown
+                this.executeTuoiCay,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+    
+    async executeTuoiCay(message, args) {
         const userId = message.author.id;
         
         // Tìm tất cả cây của người chơi trong server này
@@ -22,27 +42,37 @@ module.exports = {
                 const stageEmojis = ['🌱', '🌿', '🌳', '🎄'];
                 const emoji = stageEmojis[tree.growthStage] || '🌱';
                 
-                // Kiểm tra cooldown
+                // Kiểm tra trạng thái cây
                 const now = new Date();
-                let canWater = true;
                 let cooldownText = '';
                 
-                if (tree.lastWater) {
-                    const timeDiff = now - new Date(tree.lastWater);
-                    const minutesDiff = timeDiff / (1000 * 60);
-                    
-                    if (minutesDiff < 30) {
-                        canWater = false;
-                        const remainingMinutes = Math.ceil(30 - minutesDiff);
-                        cooldownText = `⏰ ${remainingMinutes}p nữa`;
+                // Nếu cây đã đủ 3 lần tưới và lớn rồi
+                if (tree.waterCount >= 3 && tree.growthStage >= 3) {
+                    const waitMinutes = tree.maturedAt ? (now - new Date(tree.maturedAt)) / (1000 * 60) : 0;
+                    if (waitMinutes >= 60) {
+                        cooldownText = '🎉 Có thể thu hoạch';
                     } else {
-                        cooldownText = '✅ Có thể tưới';
+                        const remainingMinutes = Math.ceil(60 - waitMinutes);
+                        cooldownText = `⏳ ${remainingMinutes}p nữa thu hoạch`;
                     }
                 } else {
-                    cooldownText = '🆕 Chưa tưới';
+                    // Kiểm tra cooldown tưới nước
+                    if (tree.lastWater) {
+                        const timeDiff = now - new Date(tree.lastWater);
+                        const minutesDiff = timeDiff / (1000 * 60);
+                        
+                        if (minutesDiff < 30) {
+                            const remainingMinutes = Math.ceil(30 - minutesDiff);
+                            cooldownText = `⏰ ${remainingMinutes}p nữa`;
+                        } else {
+                            cooldownText = '✅ Có thể tưới';
+                        }
+                    } else {
+                        cooldownText = '🆕 Chưa tưới';
+                    }
                 }
                 
-                treeList += `${index + 1}. ${emoji} **${tree.species}** - ${cooldownText}\n`;
+                treeList += `${index + 1}. ${emoji} **${tree.species}** (${tree.waterCount}/3) - ${cooldownText}\n`;
             });
             
             return message.reply(`🌱 **Bạn có ${trees.length} cây!** Chỉ định số thứ tự để tưới:\n\n${treeList}\n💡 **Cách dùng:** \`tuoicay 1\` (tưới cây số 1)`);
@@ -72,40 +102,79 @@ module.exports = {
             }
         }
 
-        // Tưới nước và cập nhật cây
-        tree.waterCount += 1;
-        tree.lastWater = now;
-        // Nếu đủ 3 lần tưới thì cập nhật plantedAt = now để tính 1 tiếng chờ thu hoạch
-        if (tree.waterCount >= 3) {
-            tree.growthStage = 3;
-            tree.plantedAt = now;
-            tree.maturedAt = now;
-            tree.deadAt = null;
+        // Kiểm tra lại cây trước khi tưới (tránh race condition)
+        const freshTree = await Tree.findById(tree._id);
+        if (freshTree.lastWater) {
+            const timeDiff = now - new Date(freshTree.lastWater);
+            const minutesDiff = timeDiff / (1000 * 60);
+            
+            if (minutesDiff < 30) {
+                const remainingMinutes = Math.ceil(30 - minutesDiff);
+                return message.reply(`⏰ Cây số ${treeNumber} vẫn đủ nước! (Phát hiện spam - còn ${remainingMinutes} phút)`);
+            }
+        }
+
+        // Kiểm tra xem cây đã đủ điều kiện thu hoạch chưa
+        if (freshTree.waterCount >= 3 && freshTree.growthStage >= 3) {
+            // Kiểm tra thời gian chờ thu hoạch
+            const waitMinutes = freshTree.maturedAt ? (now - new Date(freshTree.maturedAt)) / (1000 * 60) : 0;
+            
+            if (waitMinutes >= 60) {
+                return message.reply(`🎉 Cây số ${treeNumber} đã có thể thu hoạch rồi! Dùng lệnh \`thuhoach ${treeNumber}\` để thu hoạch thay vì tưới thêm.`);
+            } else {
+                const remainingMinutes = Math.ceil(60 - waitMinutes);
+                return message.reply(`⏳ Cây số ${treeNumber} đã đủ 3 lần tưới! Chờ thêm **${remainingMinutes} phút** nữa để thu hoạch. Không cần tưới thêm.`);
+            }
+        }
+
+        // Tưới nước và cập nhật cây (chỉ khi chưa đủ 3 lần)
+        freshTree.waterCount += 1;
+        freshTree.lastWater = now;
+        
+        // Nếu vừa đủ 3 lần tưới lần đầu tiên thì cập nhật trạng thái
+        if (freshTree.waterCount === 3 && freshTree.growthStage < 3) {
+            freshTree.growthStage = 3;
+            freshTree.maturedAt = now;
+            freshTree.deadAt = null;
+            // KHÔNG reset plantedAt - giữ nguyên thời gian trồng cây
         }
         
         // Tính tuổi cây (phút kể từ khi trồng)
-        const ageInMinutes = (now - new Date(tree.plantedAt)) / (1000 * 60);
-        tree.age = Math.floor(ageInMinutes);
+        const ageInMinutes = (now - new Date(freshTree.plantedAt)) / (1000 * 60);
+        freshTree.age = Math.floor(ageInMinutes);
 
-        await tree.save();
+        await freshTree.save();
 
         // Hiển thị trạng thái cây
         const stageNames = ['🌱 Mầm non', '🌿 Cây con', '🌳 Đang lớn', '🎄 Cây lớn'];
-        const currentStage = stageNames[tree.growthStage];
+        const currentStage = stageNames[freshTree.growthStage];
         
+        // Kiểm tra thời gian chờ thu hoạch nếu cây đã lớn
+        let harvestInfo = '';
+        if (freshTree.growthStage >= 3 && freshTree.maturedAt) {
+            const waitMinutes = (now - new Date(freshTree.maturedAt)) / (1000 * 60);
+            if (waitMinutes >= 60) {
+                harvestInfo = `🎉 **Cây đã có thể thu hoạch! Dùng lệnh \`thuhoach ${treeNumber}\`**`;
+            } else {
+                const remainingMinutes = Math.ceil(60 - waitMinutes);
+                harvestInfo = `⏳ **Còn ${remainingMinutes} phút nữa có thể thu hoạch**`;
+            }
+        } else {
+            harvestInfo = `⏳ **Cần thêm:** ${Math.max(0, 3 - freshTree.waterCount)} lần tưới`;
+        }
+
         const embed = new EmbedBuilder()
             .setTitle('💧 TƯỚI NƯỚC THÀNH CÔNG!')
-            .setDescription(`**Cây số ${treeNumber}: ${tree.species}** của ${message.author.displayName}\n\n` +
+            .setDescription(`**Cây số ${treeNumber}: ${freshTree.species}** của ${message.author.displayName}\n\n` +
                 `**📊 Trạng thái hiện tại:**\n` +
                 `🎭 Giai đoạn: ${currentStage}\n` +
-                `💧 Lần tưới: ${tree.waterCount}/3\n` +
+                `💧 Lần tưới: ${freshTree.waterCount}/3\n` +
                 `🕒 Lần tưới cuối: Vừa xong\n` +
-                (tree.growthStage >= 3 ? 
-                    `✅ **Cây đã lớn! Có thể thu hoạch sau 1 tiếng kể từ lần tưới/bón cuối cùng bằng lệnh \`thuhoach ${treeNumber}\`**` :
-                    `⏳ **Cần thêm:** ${Math.max(0, 3 - tree.waterCount)} lần tưới`))
-            .setThumbnail(TREE_IMAGES[tree.species])
-            .setColor(tree.growthStage >= 3 ? '#FFD700' : '#00FF00')
-            .setFooter({ text: `Cây số ${treeNumber} - Tưới nước tiếp theo sau 30 phút!` });
+                `${freshTree.maturedAt ? `⏰ Trưởng thành lúc: ${new Date(freshTree.maturedAt).toLocaleTimeString('vi-VN')}\n` : ''}` +
+                harvestInfo)
+            .setThumbnail(TREE_IMAGES[freshTree.species])
+            .setColor(freshTree.growthStage >= 3 ? '#FFD700' : '#00FF00')
+            .setFooter({ text: `Cây số ${treeNumber} - ${freshTree.waterCount < 3 ? 'Tưới nước tiếp theo sau 30 phút!' : 'Đã đủ nước, chờ thu hoạch!'}` });
 
         await message.reply({ embeds: [embed] });
     },

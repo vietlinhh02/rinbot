@@ -1,6 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const User = require('../../models/User');
 const { getPrefix } = require('../../utils/prefixHelper');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 // Định nghĩa shop items (giống shop.js)
 const SHOP_ITEMS = {
@@ -45,6 +46,25 @@ module.exports = {
     name: 'buy',
     description: 'Mua đồ từ cửa hàng',
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 2 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'buy', 
+                2, // 2 giây cooldown
+                this.executeBuy,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+
+    async executeBuy(message, args) {
         try {
             const prefix = await getPrefix(message.guild?.id);
             const userId = message.author.id;

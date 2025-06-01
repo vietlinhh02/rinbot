@@ -3,12 +3,32 @@ const { getCityUser, updateCityUser, getUserRin, updateUserRin, getUser } = requ
 const { getFarmUser, updateFarmUser } = require('../../utils/database');
 const { JOB_TYPES, JOB_IMAGES, POLICE_PUZZLES, JOB_NOTIFICATIONS, COLORS, TREE_VALUES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
     name: 'lamviec',
     description: 'Làm việc theo nghề nghiệp để kiếm tiền',
     
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 3 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'lamviec', 
+                3, // 3 giây cooldown
+                this.executeLamViec,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+
+    async executeLamViec(message, args) {
         try {
             const userId = message.author.id;
             const cityUser = await getCityUser(userId);

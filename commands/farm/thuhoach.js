@@ -2,12 +2,32 @@ const { EmbedBuilder } = require('discord.js');
 const { updateUserRin } = require('../../utils/database');
 const { TREE_VALUES, TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
     name: 'thuhoach',
     description: 'Thu hoạch cây đã lớn để nhận Rin',
     
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 2 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'thuhoach', 
+                2, // 2 giây cooldown
+                this.executeThuHoach,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+    
+    async executeThuHoach(message, args) {
         const userId = message.author.id;
         
         // Tìm tất cả cây của người chơi trong server này
@@ -130,18 +150,24 @@ module.exports = {
             }
         }
 
+        // Kiểm tra lại cây trước khi thu hoạch (tránh race condition)
+        const freshTree = await Tree.findById(tree._id);
+        if (!freshTree) {
+            return message.reply(`❌ Cây số ${treeNumber} không tồn tại! (Phát hiện spam)`);
+        }
+
         // Thu hoạch thành công
-        const reward = TREE_VALUES[tree.species];
+        const reward = TREE_VALUES[freshTree.species];
         const profit = reward - 50; // Trừ đi giá hạt giống
-        const profitText = tree.bonused ? profit - 30 : profit; // Trừ thêm tiền phân nếu có
+        const profitText = freshTree.bonused ? profit - 30 : profit; // Trừ thêm tiền phân nếu có
 
         await updateUserRin(userId, reward);
-        await Tree.deleteOne({ _id: tree._id }); // Xóa cây sau khi thu hoạch
+        await Tree.deleteOne({ _id: freshTree._id }); // Xóa cây sau khi thu hoạch
 
         // Tính thống kê
-        const totalDays = Math.floor(tree.age / (60 * 24));
-        const totalHours = Math.floor((tree.age % (60 * 24)) / 60);
-        const totalMinutes = tree.age % 60;
+        const totalDays = Math.floor(freshTree.age / (60 * 24));
+        const totalHours = Math.floor((freshTree.age % (60 * 24)) / 60);
+        const totalMinutes = freshTree.age % 60;
 
         let timeText = '';
         if (totalDays > 0) timeText += `${totalDays} ngày `;
@@ -153,18 +179,18 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setTitle('🎉 THU HOẠCH THÀNH CÔNG!')
-            .setDescription(`${message.author.displayName} đã thu hoạch **Cây số ${treeNumber}: ${tree.species}**!\n\n` +
+            .setDescription(`${message.author.displayName} đã thu hoạch **Cây số ${treeNumber}: ${freshTree.species}**!\n\n` +
                 `**💰 Phần thưởng:**\n` +
                 `🎁 Nhận được: **${reward} Rin**\n` +
                 `📊 Lợi nhuận ròng: **${profitText >= 0 ? '+' : ''}${profitText} Rin**\n\n` +
                 `**📈 Thống kê cây:**\n` +
                 `⏰ Thời gian nuôi: ${timeText}\n` +
-                `💧 Tổng lần tưới: ${tree.waterCount}\n` +
-                `💚 Đã bón phân: ${tree.bonused ? 'Có (+30 Rin)' : 'Không'}\n` +
+                `💧 Tổng lần tưới: ${freshTree.waterCount}\n` +
+                `💚 Đã bón phân: ${freshTree.bonused ? 'Có (+30 Rin)' : 'Không'}\n` +
                 `🌱 Giá hạt giống: 50 Rin\n\n` +
                 `**📊 Farm hiện tại:** ${remainingTrees}/5 cây\n\n` +
                 `**💡 Tip:** ${remainingTrees < 5 ? 'Có thể trồng thêm cây!' : 'Bạn có thể tiếp tục chăm sóc hoặc thu hoạch cây khác!'}`)
-            .setThumbnail(TREE_IMAGES[tree.species])
+            .setThumbnail(TREE_IMAGES[freshTree.species])
             .setColor('#FFD700')
             .setFooter({ text: 'Chúc mừng thành quả lao động của bạn!' });
 

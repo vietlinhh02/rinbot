@@ -2,12 +2,32 @@ const { EmbedBuilder } = require('discord.js');
 const { getUserRin, updateUserRin } = require('../../utils/database');
 const { TREE_IMAGES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
+const AntiSpamManager = require('../../utils/antiSpam');
 
 module.exports = {
     name: 'bonphan',
     description: 'Bón phân cho cây (30 Rin). Mỗi cây chỉ cần 3 lần tưới, sau khi đủ 3 lần tưới hoặc bón phân thì chờ 1 tiếng để thu hoạch. Mỗi người chỉ được 1 cây.',
     
     async execute(message, args) {
+        const userId = message.author.id;
+        
+        try {
+            // Bảo vệ command khỏi spam với cooldown 3 giây
+            await AntiSpamManager.executeWithProtection(
+                userId, 
+                'bonphan', 
+                3, // 3 giây cooldown
+                this.executeBonPhan,
+                this,
+                message,
+                args
+            );
+        } catch (error) {
+            return message.reply(error.message);
+        }
+    },
+    
+    async executeBonPhan(message, args) {
         const userId = message.author.id;
         
         // Tìm tất cả cây của người chơi trong server này
@@ -52,9 +72,24 @@ module.exports = {
             return message.reply('❌ Bạn cần 30 Rin để mua phân bón!');
         }
 
-        // Kiểm tra cây đã lớn chưa
-        if (tree.growthStage >= 3) {
-            return message.reply(`❌ Cây số ${treeNumber} đã lớn rồi, không cần bón phân nữa! Hãy thu hoạch.`);
+        // Kiểm tra lại trạng thái cây trước khi thực hiện (tránh race condition)
+        const freshTree = await Tree.findById(tree._id);
+        if (freshTree.bonused) {
+            return message.reply(`❌ Cây số ${treeNumber} đã được bón phân rồi! (Phát hiện spam)`);
+        }
+
+        // Kiểm tra cây đã lớn chưa (kiểm tra sau khi lấy freshTree)
+        if (freshTree.growthStage >= 3) {
+            // Kiểm tra xem có thể thu hoạch chưa
+            const now = new Date();
+            const waitMinutes = freshTree.maturedAt ? (now - new Date(freshTree.maturedAt)) / (1000 * 60) : 0;
+            
+            if (waitMinutes >= 60) {
+                return message.reply(`🎉 Cây số ${treeNumber} đã có thể thu hoạch rồi! Dùng lệnh \`thuhoach ${treeNumber}\` thay vì bón phân.`);
+            } else {
+                const remainingMinutes = Math.ceil(60 - waitMinutes);
+                return message.reply(`⏳ Cây số ${treeNumber} đã lớn rồi! Chờ thêm **${remainingMinutes} phút** nữa để thu hoạch. Không cần bón phân.`);
+            }
         }
 
         // Trừ tiền và bón phân
@@ -63,41 +98,41 @@ module.exports = {
         const now = new Date();
         
         // Tính tuổi cây hiện tại
-        const ageInMinutes = (now - new Date(tree.plantedAt)) / (1000 * 60);
-        tree.age = Math.floor(ageInMinutes);
+        const ageInMinutes = (now - new Date(freshTree.plantedAt)) / (1000 * 60);
+        freshTree.age = Math.floor(ageInMinutes);
 
         // Bonus: Nếu chưa tưới nước lần nào thì waterCount = 2, nếu đã tưới thì chỉ set waterCount = 3 nếu nhỏ hơn 3
-        if (tree.waterCount === 0) {
-            tree.waterCount = 2;
-        } else if (tree.waterCount < 3) {
-            tree.waterCount = 3;
+        if (freshTree.waterCount === 0) {
+            freshTree.waterCount = 2;
+        } else if (freshTree.waterCount < 3) {
+            freshTree.waterCount = 3;
         }
-        tree.growthStage = 3;
-        tree.plantedAt = now;
-        tree.maturedAt = now;
-        tree.deadAt = null;
-        tree.bonused = true;
-        await tree.save();
+        freshTree.growthStage = 3;
+        // KHÔNG reset plantedAt - giữ nguyên thời gian trồng cây để tính tuổi chính xác
+        freshTree.maturedAt = now; // Chỉ set maturedAt để bắt đầu đếm thời gian chờ thu hoạch
+        freshTree.deadAt = null;
+        freshTree.bonused = true;
+        await freshTree.save();
 
         // Hiển thị kết quả
         const stageNames = ['🌱 Mầm non', '🌿 Cây con', '🌳 Đang lớn', '🎄 Cây lớn'];
-        const currentStage = stageNames[tree.growthStage];
+        const currentStage = stageNames[freshTree.growthStage];
         const embed = new EmbedBuilder()
             .setTitle('💚 BÓN PHÂN THÀNH CÔNG!')
-            .setDescription(`**Cây số ${treeNumber}: ${tree.species}** của ${message.author.displayName}\n\n` +
+            .setDescription(`**Cây số ${treeNumber}: ${freshTree.species}** của ${message.author.displayName}\n\n` +
                 `**🌟 Hiệu quả phân bón:**\n` +
                 `✨ Đã bón phân, cây sẽ trưởng thành sau 1 tiếng\n` +
-                `💧 Số lần tưới hiện tại: ${tree.waterCount}/3\n` +
+                `💧 Số lần tưới hiện tại: ${freshTree.waterCount}/3\n` +
                 `💰 Tốn: 30 Rin\n\n` +
                 `**📊 Trạng thái sau khi bón:**\n` +
                 `🎭 Giai đoạn: ${currentStage}\n` +
-                `⏰ Đã trưởng thành lúc: ${tree.maturedAt ? new Date(tree.maturedAt).toLocaleString() : 'Chưa'}\n` +
-                `🕒 Lần tưới cuối: ${tree.lastWater ? new Date(tree.lastWater).toLocaleString() : 'Chưa tưới'}\n` +
-                (tree.growthStage >= 3 ? 
+                `⏰ Đã trưởng thành lúc: ${freshTree.maturedAt ? new Date(freshTree.maturedAt).toLocaleString() : 'Chưa'}\n` +
+                `🕒 Lần tưới cuối: ${freshTree.lastWater ? new Date(freshTree.lastWater).toLocaleString() : 'Chưa tưới'}\n` +
+                (freshTree.growthStage >= 3 ? 
                     `🎉 **Cây đã lớn nhờ phân bón! Có thể thu hoạch sau 1 tiếng!**` :
                     `⏳ **Cần thêm:** Đủ 3 lần tưới và chờ 1 tiếng sau khi trưởng thành`))
-            .setThumbnail(TREE_IMAGES[tree.species])
-            .setColor(tree.growthStage >= 3 ? '#FFD700' : '#00CC00')
+            .setThumbnail(TREE_IMAGES[freshTree.species])
+            .setColor(freshTree.growthStage >= 3 ? '#FFD700' : '#00CC00')
             .setFooter({ text: `Cây số ${treeNumber} - Phân bón chất lượng cao!` });
         await message.reply({ embeds: [embed] });
     },
