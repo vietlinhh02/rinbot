@@ -56,8 +56,23 @@ module.exports = {
             }
 
             if (pet.married && pet.partnerId === targetUser.id) {
-                // Nếu đã kết hôn với nhau, thử sinh sản
-                return await this.tryBreeding(message, pet, targetPet, targetUser);
+                // Kiểm tra xem có đang trong quá trình breeding không (race condition protection)
+                const breedingKey = `${userId}_${targetUser.id}`;
+                if (global.activeBreeding && global.activeBreeding.has(breedingKey)) {
+                    return message.reply('⏰ Đang xử lý yêu cầu sinh sản, vui lòng chờ!');
+                }
+                
+                // Set flag đang breeding
+                if (!global.activeBreeding) global.activeBreeding = new Set();
+                global.activeBreeding.add(breedingKey);
+                
+                try {
+                    // Nếu đã kết hôn với nhau, thử sinh sản
+                    return await this.tryBreeding(message, pet, targetPet, targetUser);
+                } finally {
+                    // Luôn cleanup flag sau khi xong
+                    global.activeBreeding.delete(breedingKey);
+                }
             }
 
             if (pet.married) {
@@ -135,11 +150,17 @@ module.exports = {
     async tryBreeding(message, pet1, pet2, targetUser) {
         const now = new Date();
         
-        // Kiểm tra cooldown breeding (24 giờ) cho CẢ HAI thú cưng
-        console.log(`Debug breeding: Pet1 lastBred: ${pet1.lastBred}, Pet2 lastBred: ${pet2.lastBred}`);
+        // Lấy lại data mới nhất từ database để tránh cache stale
+        const freshPet1 = await getPet(pet1.userId);
+        const freshPet2 = await getPet(targetUser.id);
         
-        if (pet1.lastBred) {
-            const hoursSinceLastBred1 = (now - new Date(pet1.lastBred)) / (1000 * 60 * 60);
+        console.log(`Debug breeding: Fresh Pet1 lastBred: ${freshPet1?.lastBred}, Fresh Pet2 lastBred: ${freshPet2?.lastBred}`);
+        
+        // Kiểm tra cooldown breeding (24 giờ) cho CẢ HAI thú cưng
+        console.log(`Debug breeding: Pet1 lastBred: ${freshPet1?.lastBred}, Pet2 lastBred: ${freshPet2?.lastBred}`);
+        
+        if (freshPet1?.lastBred) {
+            const hoursSinceLastBred1 = (now - new Date(freshPet1.lastBred)) / (1000 * 60 * 60);
             console.log(`Debug breeding: Pet1 hours since last bred: ${hoursSinceLastBred1}`);
             if (hoursSinceLastBred1 < 24) {
                 const remainingHours = Math.ceil(24 - hoursSinceLastBred1);
@@ -147,8 +168,8 @@ module.exports = {
             }
         }
         
-        if (pet2.lastBred) {
-            const hoursSinceLastBred2 = (now - new Date(pet2.lastBred)) / (1000 * 60 * 60);
+        if (freshPet2?.lastBred) {
+            const hoursSinceLastBred2 = (now - new Date(freshPet2.lastBred)) / (1000 * 60 * 60);
             console.log(`Debug breeding: Pet2 hours since last bred: ${hoursSinceLastBred2}`);
             if (hoursSinceLastBred2 < 24) {
                 const remainingHours = Math.ceil(24 - hoursSinceLastBred2);
@@ -156,15 +177,18 @@ module.exports = {
             }
         }
 
-        // Tính tỷ lệ thành công dựa trên tuổi và sức khỏe
-        const age1 = pet1.age || 0;
-        const age2 = pet2.age || 0;
+        // Tính tỷ lệ thành công dựa trên tuổi và sức khỏe (sử dụng fresh data)
+        const age1 = freshPet1?.age || pet1.age || 0;
+        const age2 = freshPet2?.age || pet2.age || 0;
         const avgAge = (age1 + age2) / 2;
         
         let successRate = 0.3; // Base 30%
         if (avgAge >= 10) successRate += 0.2; // +20% nếu trung bình >= 10 tuổi
         if (avgAge >= 20) successRate += 0.2; // +20% nữa nếu >= 20 tuổi
-        if (pet1.health === 'Bình thường' && pet2.health === 'Bình thường') successRate += 0.1; // +10% nếu cả hai khỏe
+        
+        const health1 = freshPet1?.health || pet1.health;
+        const health2 = freshPet2?.health || pet2.health;
+        if (health1 === 'Bình thường' && health2 === 'Bình thường') successRate += 0.1; // +10% nếu cả hai khỏe
 
         const isSuccess = Math.random() < successRate;
 
@@ -175,8 +199,8 @@ module.exports = {
 
         if (isSuccess) {
             // Sinh sản thành công
-            const breedCount1 = (pet1.breedCount || 0) + 1;
-            const breedCount2 = (pet2.breedCount || 0) + 1;
+            const breedCount1 = (freshPet1?.breedCount || pet1.breedCount || 0) + 1;
+            const breedCount2 = (freshPet2?.breedCount || pet2.breedCount || 0) + 1;
             
             await updatePet(pet1.userId, { breedCount: breedCount1 });
             await updatePet(targetUser.id, { breedCount: breedCount2 });
@@ -190,13 +214,13 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setTitle('🎉 SINH SẢN THÀNH CÔNG!')
-                .setDescription(`**${pet1.petType}** và **${pet2.petType}** đã sinh con thành công! 👶\n\n` +
+                .setDescription(`**${freshPet1?.petType || pet1.petType}** và **${freshPet2?.petType || pet2.petType}** đã sinh con thành công! 👶\n\n` +
                     `**🎁 Phần thưởng:**\n` +
                     `• ${message.author.displayName}: +${reward} Rin\n` +
                     `• ${targetUser.displayName}: +${reward} Rin\n\n` +
                     `**📊 Thống kê:**\n` +
-                    `• ${pet1.petType}: ${breedCount1} lần đẻ\n` +
-                    `• ${pet2.petType}: ${breedCount2} lần đẻ\n` +
+                    `• ${freshPet1?.petType || pet1.petType}: ${breedCount1} lần đẻ\n` +
+                    `• ${freshPet2?.petType || pet2.petType}: ${breedCount2} lần đẻ\n` +
                     `• Tỷ lệ thành công: ${Math.round(successRate * 100)}%\n\n` +
                     `**⏰ Lần tiếp theo:** 24 giờ nữa`)
                 .setColor('#00FF00')
@@ -209,7 +233,7 @@ module.exports = {
             // Sinh sản thất bại
             const embed = new EmbedBuilder()
                 .setTitle('😔 SINH SẢN THẤT BẠI')
-                .setDescription(`**${pet1.petType}** và **${pet2.petType}** đã cố gắng nhưng không thành công...\n\n` +
+                .setDescription(`**${freshPet1?.petType || pet1.petType}** và **${freshPet2?.petType || pet2.petType}** đã cố gắng nhưng không thành công...\n\n` +
                     `**📊 Thông tin:**\n` +
                     `• Tỷ lệ thành công: ${Math.round(successRate * 100)}%\n` +
                     `• Kết quả: Thất bại\n` +
