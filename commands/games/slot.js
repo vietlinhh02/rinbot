@@ -76,7 +76,7 @@ module.exports = {
         });
 
         let slotResultKeys = []; 
-        const houseAdvantageWins = Math.random() < 0.40; 
+        const houseAdvantageWins = Math.random() < 0.60; 
 
         if (houseAdvantageWins) {
             // NHÀ CÁI THẮNG (NGƯỜI CHƠI THUA): Tạo 3 slot khác nhau
@@ -106,7 +106,7 @@ module.exports = {
                 }
             }
         } else {
-            // NGƯỜI CHƠI CÓ CƠ HỘI THẮNG (80%): Tạo 3 slot giống nhau
+            
             // Loại thắng được xác định bởi winningOutcomeArray (dựa trên SYMBOLS.weight)
             const winningSymbolKey = winningOutcomeArray[Math.floor(Math.random() * winningOutcomeArray.length)];
             slotResultKeys = [winningSymbolKey, winningSymbolKey, winningSymbolKey];
