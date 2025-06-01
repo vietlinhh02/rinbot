@@ -69,6 +69,60 @@ class ControlView extends ActionRowBuilder {
 module.exports = {
     name: 'bcgo',
     description: 'Bắt đầu ván Bầu Cua',
+
+    // Cập nhật embed game để hiển thị người cược
+    async updateGameEmbed(interaction, game) {
+        try {
+            // Tạo danh sách người đã xác nhận cược
+            let playerList = '';
+            let totalPlayers = 0;
+            let totalAmount = 0;
+
+            for (const [userId, userBets] of game.bets) {
+                const betTotal = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
+                if (betTotal > 0) {
+                    const user = await interaction.client.users.fetch(userId);
+                    const betDetails = Object.entries(userBets)
+                        .map(([animal, amount]) => `${BAU_CUA_EMOJIS[animal]}${amount}`)
+                        .join(' ');
+                    playerList += `• **${user.displayName}**: ${betDetails} (${betTotal} Rin)\n`;
+                    totalPlayers++;
+                    totalAmount += betTotal;
+                }
+            }
+
+            const embed = new EmbedBuilder()
+                .setTitle('🎰 BẦU CUA ĐANG MỞ')
+                .setDescription(`**Quản trò:** ${game.host.displayName}\n\n${totalPlayers > 0 ? `**Người đã cược (${totalPlayers}):**\n${playerList}\n**Tổng số tiền:** ${totalAmount.toLocaleString()} Rin\n\n` : ''}Bấm vào các nút để đặt cược!`)
+                .addFields(
+                    { name: '📋 Luật chơi:', value: 
+                        '• Chọn con vật để cược\n' +
+                        '• Quản trò sẽ quay 3 xúc xắc\n' +
+                        '• Trúng 1 con: x1 tiền cược\n' +
+                        '• Trúng 2 con: x2 tiền cược\n' +
+                        '• Trúng 3 con: x4 tiền cược\n' +
+                        '• Không trúng: tiền cược trả cho chủ xòng'
+                    }
+                )
+                .setColor(totalPlayers > 0 ? '#00FF00' : '#FFD700')
+                .setThumbnail('https://i.pinimg.com/originals/37/27/af/3727afbe6ca619733cba6c07a6c4fcd7.gif');
+
+            const betViews = createBetViews();
+            const controlView = new ControlView();
+
+            // Edit message game gốc nếu có messageId
+            if (game.messageId) {
+                try {
+                    const gameMessage = await interaction.channel.messages.fetch(game.messageId);
+                    await gameMessage.edit({ embeds: [embed], components: [...betViews, controlView] });
+                } catch (error) {
+                    console.error('Không thể edit message game:', error);
+                }
+            }
+        } catch (error) {
+            console.error('Lỗi update game embed:', error);
+        }
+    },
     async execute(message, args) {
         const channelId = message.channel.id;
         
@@ -82,7 +136,8 @@ module.exports = {
             host: message.author,
             bets: new Map(), // userId -> {animal: amount}
             started: false,
-            participants: new Set()
+            participants: new Set(),
+            messageId: null // Lưu ID message game để edit sau
         });
 
         const embed = new EmbedBuilder()
@@ -104,10 +159,13 @@ module.exports = {
         const betViews = createBetViews();
         const controlView = new ControlView();
 
-        await message.reply({ 
+        const gameMessage = await message.reply({ 
             embeds: [embed], 
             components: [...betViews, controlView] 
         });
+
+        // Lưu message ID để edit sau
+        games.get(channelId).messageId = gameMessage.id;
     },
 
     // Xử lý interactions
@@ -203,6 +261,9 @@ module.exports = {
                 .setColor('#00FF00');
 
             await interaction.reply({ embeds: [confirmEmbed] });
+
+            // Cập nhật embed chính để hiển thị danh sách người cược
+            await module.exports.updateGameEmbed(interaction, game);
             return;
         }
 
