@@ -10,10 +10,16 @@ try {
     const canvasModule = require('canvas');
     canvas = canvasModule;
     GIFEncoder = require('gif-encoder-2');
+    
+    // Test cơ bản để đảm bảo Canvas hoạt động
+    const testCanvas = canvas.createCanvas(10, 10);
+    testCanvas.getContext('2d');
+    
     canvasAvailable = true;
     console.log('✅ Canvas và GIF encoder sẵn sàng');
 } catch (error) {
     console.log('⚠️ Canvas không khả dụng, sử dụng text-based fallback');
+    console.log('🔍 Chi tiết lỗi:', error.message);
     canvasAvailable = false;
 }
 
@@ -28,6 +34,12 @@ class ImageUtils {
      * Get card image filename từ suit và value
      */
     getCardImageName(suit, value) {
+        // Validate inputs
+        if (!suit || value === undefined || value === null) {
+            console.warn('⚠️ Card data không hợp lệ, sử dụng mặt sau - suit:', suit, 'value:', value);
+            return 'red_back.png'; // Fallback to card back
+        }
+
         const suitMap = {
             'hearts': 'H',
             'diamonds': 'D', 
@@ -44,6 +56,11 @@ class ImageUtils {
         
         const suitCode = suitMap[suit];
         const valueCode = valueMap[value] || value.toString();
+        
+        if (!suitCode) {
+            console.warn('⚠️ Suit không hợp lệ, sử dụng mặt sau - suit:', suit, 'suitCode:', suitCode);
+            return 'red_back.png';
+        }
         
         return `${valueCode}${suitCode}.png`;
     }
@@ -83,8 +100,8 @@ class ImageUtils {
             ctx.fillText('DEALER', centerX, dealerY - 10);
             
             // Vẽ player hands
-            if (Array.isArray(playerHands[0])) {
-                // Nhiều người chơi
+            if (playerHands.length > 0 && playerHands[0] && typeof playerHands[0] === 'object' && playerHands[0].hand) {
+                // Format mới: array of player objects với {name, hand}
                 const playersCount = playerHands.length;
                 const playerSpacing = Math.min(200, canvasElement.width / (playersCount + 1));
                 
@@ -101,8 +118,8 @@ class ImageUtils {
                         playerHands[i].name.substring(0, 10) + '...' : playerHands[i].name;
                     ctx.fillText(displayName, playerX, playerY + this.cardHeight + 20);
                 }
-            } else {
-                // Một người chơi (backward compatibility)
+            } else if (Array.isArray(playerHands) && playerHands.length > 0) {
+                // Format cũ: array of cards (backward compatibility)
                 const playerY = centerY + 60;
                 await this.drawHand(ctx, playerHands, centerX, playerY);
             }
@@ -123,21 +140,57 @@ class ImageUtils {
      * Vẽ một hand cards lên canvas
      */
     async drawHand(ctx, hand, centerX, startY) {
+        if (!hand || hand.length === 0) {
+            // Không log warning cho empty hands - đây là trường hợp bình thường
+            return;
+        }
+
         const totalWidth = (hand.length * this.cardWidth) + ((hand.length - 1) * 10);
         let startX = centerX - (totalWidth / 2);
         
         for (const card of hand) {
             let cardImage;
+            let cardImagePath;
             
-            if (card.hidden) {
-                // Vẽ mặt sau
-                const backPath = path.join(__dirname, '../modules/cards/red_back.png');
-                cardImage = await canvas.loadImage(backPath);
-            } else {
-                // Vẽ mặt trước
-                const cardFileName = this.getCardImageName(card.suit, card.value);
-                const cardPath = path.join(__dirname, '../modules/cards', cardFileName);
-                cardImage = await canvas.loadImage(cardPath);
+            try {
+                // Check nếu card có method image (Card class)
+                if (card.image && !card.down && !card.hidden) {
+                    cardImagePath = path.join(__dirname, '../modules/cards', card.image);
+                    cardImage = await canvas.loadImage(cardImagePath);
+                } else {
+                    // Fallback cho card object thông thường
+                    const isHidden = card.hidden || card.down;
+                    
+                    if (isHidden) {
+                        // Vẽ mặt sau
+                        cardImagePath = path.join(__dirname, '../modules/cards/red_back.png');
+                        cardImage = await canvas.loadImage(cardImagePath);
+                    } else {
+                        // Vẽ mặt trước - validate card data
+                        if (!card.suit || (card.value === undefined && card.rank === undefined)) {
+                            console.warn('⚠️ Card thiếu suit/value, sử dụng mặt sau:', JSON.stringify(card));
+                            cardImagePath = path.join(__dirname, '../modules/cards/red_back.png');
+                            cardImage = await canvas.loadImage(cardImagePath);
+                        } else {
+                            const cardValue = card.value || card.rank;
+                            const cardFileName = this.getCardImageName(card.suit, cardValue);
+                            cardImagePath = path.join(__dirname, '../modules/cards', cardFileName);
+                            
+                            // Check file exists
+                            if (!require('fs').existsSync(cardImagePath)) {
+                                console.warn('⚠️ Card image không tồn tại:', cardFileName, '- sử dụng mặt sau');
+                                cardImagePath = path.join(__dirname, '../modules/cards/red_back.png');
+                            }
+                            
+                            cardImage = await canvas.loadImage(cardImagePath);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Lỗi load card image:', error.message);
+                // Fallback to card back
+                cardImagePath = path.join(__dirname, '../modules/cards/red_back.png');
+                cardImage = await canvas.loadImage(cardImagePath);
             }
             
             ctx.drawImage(cardImage, startX, startY, this.cardWidth, this.cardHeight);
@@ -345,7 +398,7 @@ class ImageUtils {
             const dealerY = centerY - 120;
             
             // Tính số frame animation
-            const playerHandLengths = Array.isArray(playerHands[0]) ? 
+            const playerHandLengths = (playerHands.length > 0 && playerHands[0] && typeof playerHands[0] === 'object' && playerHands[0].hand) ? 
                 playerHands.map(p => p.hand ? p.hand.length : 0) : 
                 [playerHands.length];
             const maxCards = Math.max(dealerHand.length, ...playerHandLengths);
@@ -361,7 +414,7 @@ class ImageUtils {
             ctx.fillText('DEALER', centerX, dealerY - 10);
             
             // Vẽ tên người chơi
-            if (Array.isArray(playerHands[0])) {
+            if (playerHands.length > 0 && playerHands[0] && typeof playerHands[0] === 'object' && playerHands[0].hand) {
                 const playersCount = playerHands.length;
                 const playerSpacing = Math.min(200, canvasElement.width / (playersCount + 1));
                 
@@ -398,7 +451,7 @@ class ImageUtils {
                 }
                 
                 // Vẽ player cards đến cardIndex hiện tại
-                if (Array.isArray(playerHands[0])) {
+                if (playerHands.length > 0 && playerHands[0] && typeof playerHands[0] === 'object' && playerHands[0].hand) {
                     const playersCount = playerHands.length;
                     const playerSpacing = Math.min(200, canvasElement.width / (playersCount + 1));
                     
@@ -420,8 +473,8 @@ class ImageUtils {
                             playerHands[i].name.substring(0, 10) + '...' : playerHands[i].name;
                         ctx.fillText(displayName, playerX, playerY + this.cardHeight + 20);
                     }
-                } else {
-                    // Single player mode
+                } else if (Array.isArray(playerHands) && playerHands.length > 0) {
+                    // Single player mode (backward compatibility)
                     const playerY = centerY + 60;
                     if (cardIndex < playerHands.length) {
                         const playerCardsToShow = playerHands.slice(0, cardIndex + 1);
@@ -445,7 +498,7 @@ class ImageUtils {
             
             await this.drawHand(ctx, dealerHand, centerX, dealerY);
             
-            if (Array.isArray(playerHands[0])) {
+            if (playerHands.length > 0 && playerHands[0] && typeof playerHands[0] === 'object' && playerHands[0].hand) {
                 const playersCount = playerHands.length;
                 const playerSpacing = Math.min(200, canvasElement.width / (playersCount + 1));
                 
@@ -460,7 +513,7 @@ class ImageUtils {
                         playerHands[i].name.substring(0, 10) + '...' : playerHands[i].name;
                     ctx.fillText(displayName, playerX, playerY + this.cardHeight + 20);
                 }
-            } else {
+            } else if (Array.isArray(playerHands) && playerHands.length > 0) {
                 const playerY = centerY + 60;
                 await this.drawHand(ctx, playerHands, centerX, playerY);
             }

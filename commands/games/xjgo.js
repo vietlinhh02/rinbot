@@ -326,6 +326,8 @@ async function handleStart(interaction, channelId) {
         
         const game = global.games[channelId];
         if (!game) {
+            // Unlock game trước khi return
+            gameLocks.delete(channelId);
             if (!interaction.replied && !interaction.deferred) {
                 return await interaction.reply({ 
                     content: '❌ Không có bàn game nào!', 
@@ -337,6 +339,8 @@ async function handleStart(interaction, channelId) {
 
         if (game.started) {
             console.log('⚠️ Game đã bắt đầu, không thể start lại:', interaction.user.displayName);
+            // Unlock game trước khi return
+            gameLocks.delete(channelId);
             if (!interaction.replied && !interaction.deferred) {
                 return await interaction.reply({ 
                     content: '❌ Game đã bắt đầu rồi!', 
@@ -347,6 +351,8 @@ async function handleStart(interaction, channelId) {
         }
 
         if (interaction.user.id !== game.host.id) {
+            // Unlock game trước khi return
+            gameLocks.delete(channelId);
             if (!interaction.replied && !interaction.deferred) {
                 return await interaction.reply({ 
                     content: '⛔ Chỉ nhà cái được bắt đầu!', 
@@ -357,6 +363,8 @@ async function handleStart(interaction, channelId) {
         }
 
         if (Object.keys(game.players).length === 0) {
+            // Unlock game trước khi return
+            gameLocks.delete(channelId);
             if (!interaction.replied && !interaction.deferred) {
                 return await interaction.reply({ 
                     content: '❌ Chưa có ai tham gia! Cần ít nhất 1 người chơi để bắt đầu.', 
@@ -367,6 +375,8 @@ async function handleStart(interaction, channelId) {
         }
 
         if (Object.keys(game.players).length > 13) {
+            // Unlock game trước khi return
+            gameLocks.delete(channelId);
             if (!interaction.replied && !interaction.deferred) {
                 return await interaction.reply({ 
                     content: '❌ Quá nhiều người chơi! Tối đa 13 người.', 
@@ -481,14 +491,14 @@ async function showDealingAnimation(interaction, channelId) {
     const tempFiles = [];
     
     try {
-        // Chuẩn bị data cho animation với validation
-        const dealerHand = game.hostCards || [];
+        // Chuẩn bị data cho animation với validation - TẤT CẢ cards mặt sau
+        const dealerHand = (game.hostCards || []).map(card => ({ ...card, down: true }));
         const playerHands = Object.values(game.players).map(p => ({
             name: p.user.displayName,
-            hand: p.cards || []
+            hand: (p.cards || []).map(card => ({ ...card, down: true }))
         }));
 
-        // Validate card data
+        // Validate card data và preserve properties
         const validateCard = (card) => {
             return card && 
                    typeof card.suit === 'string' && 
@@ -496,23 +506,46 @@ async function showDealingAnimation(interaction, channelId) {
                    ['hearts', 'diamonds', 'clubs', 'spades'].includes(card.suit) &&
                    card.value >= 2 && card.value <= 14;
         };
+        
+        const preserveCardProperties = (card) => {
+            return {
+                suit: card.suit,
+                value: card.value,
+                hidden: card.hidden || false,
+                down: card.down || false
+            };
+        };
 
-        // Check dealer hand
-        const validDealerHand = dealerHand.filter(validateCard);
+        // Check dealer hand và preserve down property
+        const validDealerHand = dealerHand
+            .filter(validateCard)
+            .map(preserveCardProperties);
         if (validDealerHand.length !== dealerHand.length) {
             console.log('⚠️ Có card không hợp lệ trong dealer hand:', dealerHand);
             throw new Error('Invalid dealer cards');
         }
 
-        // Check player hands
+        // Check player hands và preserve structure
+        const validPlayerHands = [];
         for (const playerHand of playerHands) {
-            const validCards = playerHand.hand.filter(validateCard);
+            const validCards = playerHand.hand
+                .filter(validateCard)
+                .map(preserveCardProperties);
             if (validCards.length !== playerHand.hand.length) {
                 console.log('⚠️ Có card không hợp lệ trong player hand:', playerHand.hand);
                 throw new Error('Invalid player cards');
             }
+            validPlayerHands.push({
+                name: playerHand.name,
+                hand: validCards
+            });
         }
 
+        console.log('🔍 Animation dealer first card:', JSON.stringify(validDealerHand[0]));
+        if (validPlayerHands[0]) {
+            console.log('🔍 Animation player first card:', JSON.stringify(validPlayerHands[0].hand[0]));
+        }
+        
         // Tạo GIF animation
         const gifPath = path.join(__dirname, `../../temp/xidach_deal_${Date.now()}.gif`);
         tempFiles.push(gifPath);
@@ -521,7 +554,7 @@ async function showDealingAnimation(interaction, channelId) {
         const tempDir = path.dirname(gifPath);
         require('fs').mkdirSync(tempDir, { recursive: true });
         
-        await imageUtils.createBlackjackGIF(validDealerHand, playerHands, gifPath);
+        await imageUtils.createBlackjackGIF(validDealerHand, validPlayerHands, gifPath);
         
         const attachment = new AttachmentBuilder(gifPath, { name: 'xidach_deal.gif' });
         
@@ -590,28 +623,91 @@ async function startNextTurn(channel, channelId) {
         .setDescription(`${currentPlayer}, gõ \`,xjrin\` để xem bài và hành động!`)
         .setColor('#0099FF');
 
-    await channel.send({ embeds: [embed] });
+    // Tạo hình ảnh hiển thị trạng thái bàn hiện tại
+    try {
+        const imageUtils = require('../../utils/imageUtils');
+        if (imageUtils.isCanvasAvailable()) {
+            const path = require('path');
+            const { AttachmentBuilder } = require('discord.js');
+            
+            const imagePath = path.join(__dirname, `../../temp/xjgo_turn_${Date.now()}.png`);
+            
+            // Tạo temp directory
+            require('fs').mkdirSync(path.dirname(imagePath), { recursive: true });
+            
+            // Chuẩn bị data: hiển thị TẤT CẢ bài úp (mặt sau)
+            const dealerHand = game.hostCards.map(card => ({ ...card, down: true })); // Dealer bài úp
+            const playerHands = Object.values(game.players).map(p => ({
+                name: p.user.displayName,
+                hand: p.cards.map(card => ({ ...card, down: true })) // Player bài cũng úp
+            }));
+            
+            await imageUtils.createBlackjackTable(dealerHand, playerHands, imagePath);
+            
+            const attachment = new AttachmentBuilder(imagePath, { name: 'game_table.png' });
+            embed.setImage('attachment://game_table.png');
+            
+            await channel.send({ embeds: [embed], files: [attachment] });
+            
+            // Cleanup sau 10 giây
+            setTimeout(() => {
+                imageUtils.cleanupTempFiles([imagePath]);
+            }, 10000);
+        } else {
+            // Text fallback
+            await channel.send({ embeds: [embed] });
+        }
+    } catch (error) {
+        console.error('Lỗi tạo hình ảnh turn:', error);
+        // Text fallback
+        await channel.send({ embeds: [embed] });
+    }
 }
 
 // End game
 async function endGame(channel, channelId) {
+    console.log('🏁 === BẮT ĐẦU END GAME ===');
     const game = global.games[channelId];
-    if (!game) return;
+    if (!game) {
+        console.log('❌ Không tìm thấy game khi endGame');
+        return;
+    }
+
+    console.log('📊 Game stats:');
+    console.log('  - Host:', game.host.displayName);
+    console.log('  - Players:', Object.keys(game.players).length);
+    console.log('  - Host cards:', game.hostCards?.length || 0);
 
     const hostPoints = calculatePoints(game.hostCards);
     const hostSpecial = checkSpecialHand(game.hostCards);
+    console.log('🏠 Host:', hostPoints, 'điểm', hostSpecial ? `(${hostSpecial})` : '');
 
     const tempFiles = [];
     
     try {
+        // Kiểm tra Canvas availability
+        if (!imageUtils.isCanvasAvailable()) {
+            console.log('❌ Canvas không khả dụng - fallback text');
+            throw new Error('Canvas không khả dụng');
+        }
+        
+        console.log('🖼️ Tạo hình ảnh kết quả game...');
+        
         // Chuẩn bị data cho hình ảnh kết quả với validation
         const dealerHand = game.hostCards || [];
         const playerHands = Object.values(game.players).map(p => ({
             name: p.user.displayName,
             hand: p.cards || []
         }));
+        
+        console.log('🏠 Dealer hand:', dealerHand.length, 'cards');
+        console.log('🔍 First dealer card:', JSON.stringify(dealerHand[0]));
+        console.log('👥 Player hands:', playerHands.length, 'players');
+        if (playerHands[0]) {
+            console.log('🔍 First player card:', JSON.stringify(playerHands[0].hand[0]));
+        }
 
-        // Validate card data (same validation as animation)
+        // Validate card data và preserve down property
         const validateCard = (card) => {
             return card && 
                    typeof card.suit === 'string' && 
@@ -619,29 +715,52 @@ async function endGame(channel, channelId) {
                    ['hearts', 'diamonds', 'clubs', 'spades'].includes(card.suit) &&
                    card.value >= 2 && card.value <= 14;
         };
+        
+        const preserveCardProperties = (card) => {
+            return {
+                suit: card.suit,
+                value: card.value,
+                hidden: card.hidden || false,
+                down: card.down || false
+            };
+        };
 
-        const validDealerHand = dealerHand.filter(validateCard);
+        // Filter và ensure tất cả bài FACE-UP khi kết thúc game
+        const validDealerHand = dealerHand
+            .filter(validateCard)
+            .map(card => ({ ...preserveCardProperties(card), down: false })); // Force face-up
         const validPlayerHands = playerHands.map(p => ({
             name: p.name,
-            hand: p.hand.filter(validateCard)
+            hand: p.hand
+                .filter(validateCard)
+                .map(card => ({ ...preserveCardProperties(card), down: false })) // Force face-up
         }));
 
-        // Tạo hình ảnh static cho kết quả
-        const imagePath = path.join(__dirname, `../../temp/xidach_result_${Date.now()}.png`);
-        tempFiles.push(imagePath);
+        console.log('🔍 Result dealer first card:', JSON.stringify(validDealerHand[0]));
+        if (validPlayerHands[0] && validPlayerHands[0].hand[0]) {
+            console.log('🔍 Result player first card:', JSON.stringify(validPlayerHands[0].hand[0]));
+        }
+
+        // Tạo GIF animation mở bài cho kết quả
+        const path = require('path');
+        const gifPath = path.join(__dirname, `../../temp/xidach_result_${Date.now()}.gif`);
+        tempFiles.push(gifPath);
         
         // Tạo temp directory nếu chưa có
-        const tempDir = path.dirname(imagePath);
+        const tempDir = path.dirname(gifPath);
         require('fs').mkdirSync(tempDir, { recursive: true });
         
-        await imageUtils.createBlackjackTable(validDealerHand, validPlayerHands, imagePath);
+        console.log('🎬 Tạo GIF animation mở bài kết quả...');
+        await imageUtils.createBlackjackGIF(validDealerHand, validPlayerHands, gifPath);
+        console.log('✅ GIF kết quả tạo thành công:', gifPath);
         
-        const attachment = new AttachmentBuilder(imagePath, { name: 'xidach_result.png' });
+        const attachment = new AttachmentBuilder(gifPath, { name: 'xidach_result.gif' });
         
         const embed = new EmbedBuilder()
             .setTitle('🎲 KẾT QUẢ XÌ DÁCH')
+            .setDescription('🃏 **Tất cả bài đã được mở!**')
             .setColor('#0099FF')
-            .setImage('attachment://xidach_result.png');
+            .setImage('attachment://xidach_result.gif');
 
         let hostMsg = `${game.hostCards.map(getCardString).join(', ')} (${hostPoints} điểm)`;
         if (hostSpecial) hostMsg += ` - ${hostSpecial}`;
@@ -790,17 +909,145 @@ async function endGame(channel, channelId) {
 
     } catch (error) {
         console.error('Lỗi tạo hình ảnh kết quả:', error);
-        // Fallback về text display
+        // Fallback về text display với đầy đủ thông tin
         const embed = new EmbedBuilder()
             .setTitle('🎲 KẾT QUẢ XÌ DÁCH')
             .setColor('#0099FF');
 
-        let hostMsg = `Nhà cái: ${game.hostCards.map(getCardString).join(', ')} (${hostPoints} điểm)`;
+        let hostMsg = `${game.hostCards.map(getCardString).join(', ')} (${hostPoints} điểm)`;
         if (hostSpecial) hostMsg += ` - ${hostSpecial}`;
         
         embed.addFields({ name: '🏠 Nhà cái', value: hostMsg, inline: false });
 
-        // Thêm logic game tương tự như trên cho fallback...
+        let totalHostWinnings = 0;
+        let totalHostLosses = 0;
+
+        for (const [pid, pdata] of Object.entries(game.players)) {
+            const playerPoints = calculatePoints(pdata.cards);
+            const playerSpecial = checkSpecialHand(pdata.cards);
+            const bet = pdata.bet;
+            
+            let playerMsg = `${pdata.cards.map(getCardString).join(', ')} (${playerPoints} điểm)`;
+            if (playerSpecial) playerMsg += ` - ${playerSpecial}`;
+            
+            let outcome = '';
+            let playerWinAmount = 0;
+
+            // Áp dụng luật game (copy từ phần trên)
+            if (playerSpecial === "Xì Bàn") {
+                playerWinAmount = bet + (bet * 3);
+                totalHostLosses += bet * 3;
+                outcome = `🎉 Xì Bàn – Thắng +${bet * 3} Rin`;
+            } else if (hostSpecial === "Xì Bàn") {
+                totalHostWinnings += bet;
+                outcome = `❌ Thua Xì Bàn nhà cái – Mất ${bet} Rin`;
+            } else if (playerSpecial === "Ngũ Linh") {
+                if (hostSpecial === "Ngũ Linh") {
+                    playerWinAmount = bet;
+                    outcome = '🤝 Hòa (cả hai Ngũ Linh)';
+                } else {
+                    playerWinAmount = bet + (bet * 2);
+                    totalHostLosses += bet * 2;
+                    outcome = `🎉 Ngũ Linh – Thắng +${bet * 2} Rin`;
+                }
+            } else if (hostSpecial === "Ngũ Linh") {
+                totalHostWinnings += bet;
+                outcome = `❌ Thua Ngũ Linh nhà cái – Mất ${bet} Rin`;
+            } else if (playerSpecial === "Xì Dách") {
+                if (hostSpecial === "Xì Dách") {
+                    playerWinAmount = bet;
+                    outcome = `🤝 Hòa (cùng Xì Dách)`;
+                } else {
+                    playerWinAmount = bet + (bet * 2);
+                    totalHostLosses += bet * 2;
+                    outcome = `🎉 Xì Dách – Thắng +${bet * 2} Rin`;
+                }
+            } else if (hostSpecial === "Xì Dách") {
+                totalHostWinnings += bet;
+                outcome = `❌ Thua Xì Dách nhà cái – Mất ${bet} Rin`;
+            } else {
+                // Logic điểm thường
+                if (playerPoints >= 28) {
+                    totalHostWinnings += bet * 2;
+                    outcome = `💥 Quắc nặng (${playerPoints}) – Mất ${bet * 2} Rin`;
+                } else if (playerPoints >= 22 && playerPoints <= 27 && hostPoints >= 22 && hostPoints <= 27) {
+                    playerWinAmount = bet;
+                    outcome = `🤝 Hòa (cả hai quắc nhẹ: ${playerPoints} vs ${hostPoints})`;
+                } else if (playerPoints >= 22 && playerPoints <= 27) {
+                    if (hostPoints > 21) {
+                        playerWinAmount = bet;
+                        outcome = `🤝 Hòa (player quắc nhẹ ${playerPoints}, nhà cái quắc ${hostPoints})`;
+                    } else {
+                        totalHostWinnings += bet;
+                        outcome = `❌ Quắc nhẹ (${playerPoints}) – Mất ${bet} Rin`;
+                    }
+                } else if (hostPoints >= 22 && hostPoints <= 27) {
+                    if (playerPoints > 21) {
+                        playerWinAmount = bet;
+                        outcome = `🤝 Hòa (nhà cái quắc nhẹ ${hostPoints}, player quắc ${playerPoints})`;
+                    } else {
+                        playerWinAmount = bet + bet;
+                        totalHostLosses += bet;
+                        outcome = `✅ Nhà cái quắc nhẹ – Thắng +${bet} Rin`;
+                    }
+                } else if (hostPoints >= 28) {
+                    playerWinAmount = bet + bet;
+                    totalHostLosses += bet;
+                    outcome = `✅ Nhà cái quắc nặng – Thắng +${bet} Rin`;
+                } else if (playerPoints < 16) {
+                    totalHostWinnings += bet * 2;
+                    outcome = `👶 Chưa đủ tuổi (${playerPoints}) – Mất ${bet * 2} Rin`;
+                } else if (hostPoints < 16) {
+                    playerWinAmount = bet + bet;
+                    totalHostLosses += bet;
+                    outcome = `✅ Nhà cái chưa đủ tuổi – Thắng +${bet} Rin`;
+                } else if (playerPoints > hostPoints) {
+                    playerWinAmount = bet + bet;
+                    totalHostLosses += bet;
+                    outcome = `✅ Thắng điểm (${playerPoints} vs ${hostPoints}) – Thắng +${bet} Rin`;
+                } else if (playerPoints < hostPoints) {
+                    totalHostWinnings += bet;
+                    outcome = `❌ Thua điểm (${playerPoints} vs ${hostPoints}) – Mất ${bet} Rin`;
+                } else {
+                    playerWinAmount = bet;
+                    outcome = `🤝 Hòa điểm (${playerPoints})`;
+                }
+            }
+
+            if (playerWinAmount > 0) {
+                await updateUserRin(pdata.user.id, playerWinAmount);
+            }
+
+            embed.addFields({ 
+                name: pdata.user.displayName, 
+                value: `${playerMsg}\n${outcome}`, 
+                inline: false 
+            });
+        }
+
+        // Cập nhật tiền cho nhà cái
+        const hostNetWinnings = totalHostWinnings - totalHostLosses;
+        if (hostNetWinnings > 0) {
+            await updateUserRin(game.host.id, hostNetWinnings);
+            embed.addFields({ 
+                name: '💰 Nhà cái', 
+                value: `🎉 Thắng ròng: +${hostNetWinnings} Rin`, 
+                inline: false 
+            });
+        } else if (hostNetWinnings < 0) {
+            embed.addFields({ 
+                name: '💰 Nhà cái', 
+                value: `💸 Thua ròng: ${hostNetWinnings} Rin`, 
+                inline: false 
+            });
+        } else {
+            embed.addFields({ 
+                name: '💰 Nhà cái', 
+                value: `🤝 Hòa vốn: 0 Rin`, 
+                inline: false 
+            });
+        }
+
         await channel.send({ embeds: [embed] });
     }
     
