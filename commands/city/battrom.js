@@ -79,19 +79,29 @@ module.exports = {
 
         const puzzleMsg = await message.reply({ embeds: [embed] });
 
-        // Đợi câu trả lời
-        const filter = (msg) => msg.author.id === message.author.id;
+        // Đợi câu trả lời với filter cải thiện
+        const filter = (msg) => {
+            return msg.author.id === message.author.id && 
+                   msg.channel.id === message.channel.id &&
+                   !msg.author.bot;
+        };
         
         try {
+            console.log(`[BẮT TRỘM] Bắt đầu đợi câu trả lời từ ${message.author.displayName}...`);
+            
             const collected = await message.channel.awaitMessages({ 
                 filter, 
                 max: 1, 
-                time: 30000, 
-                errors: ['time'] 
+                time: 30000,
+                errors: ['time']
             });
+            
+            console.log(`[BẮT TRỘM] Nhận được câu trả lời từ ${message.author.displayName}`);
             
             const answer = collected.first().content.toLowerCase().trim();
             const correctAnswer = puzzle.answer.toLowerCase().trim();
+            
+            console.log(`[BẮT TRỘM] Câu trả lời: "${answer}" | Đáp án: "${correctAnswer}"`);
             
             if (answer === correctAnswer) {
                 // Bắt thành công
@@ -102,8 +112,16 @@ module.exports = {
             }
 
         } catch (error) {
-            // Hết thời gian
-            await this.handleTimeout(message, policeUser, thiefUser);
+            console.log(`[BẮT TRỘM] Error caught:`, error.message);
+            
+            // Kiểm tra nếu thực sự là timeout
+            if (error.message && error.message.includes('time')) {
+                console.log(`[BẮT TRỘM] Timeout - hết thời gian 30 giây`);
+                await this.handleTimeout(message, policeUser, thiefUser);
+            } else {
+                console.error(`[BẮT TRỘM] Lỗi không xác định:`, error);
+                await message.reply('❌ Có lỗi xảy ra trong quá trình bắt trộm!');
+            }
         }
     },
 

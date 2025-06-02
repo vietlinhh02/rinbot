@@ -1,18 +1,27 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
+function getCardString(card) {
+    const suits = { 'hearts': '♥️', 'diamonds': '♦️', 'clubs': '♣️', 'spades': '♠️' };
+    const values = {
+        2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
+        11: 'J', 12: 'Q', 13: 'K', 14: 'A'
+    };
+    
+    return `${values[card.value]}${suits[card.suit]}`;
+}
+
 function calculatePoints(cards) {
     let points = 0;
     let aces = 0;
     
     for (const card of cards) {
-        const rank = card.slice(0, -1);
-        if (['J', 'Q', 'K'].includes(rank)) {
+        if (card.value >= 11 && card.value <= 13) { // J, Q, K
             points += 10;
-        } else if (rank === 'A') {
+        } else if (card.value === 14) { // A
             points += 11;
             aces++;
         } else {
-            points += parseInt(rank);
+            points += card.value;
         }
     }
     
@@ -27,11 +36,11 @@ function calculatePoints(cards) {
 
 function checkSpecialHand(cards) {
     if (cards.length === 2) {
-        const ranks = cards.map(card => card.slice(0, -1));
-        if (ranks.includes('A') && ['10', 'J', 'Q', 'K'].some(r => ranks.includes(r))) {
+        const values = cards.map(card => card.value);
+        if (values.includes(14) && [10, 11, 12, 13].some(v => values.includes(v))) {
             return "Xì Dách";
         }
-        if (ranks[0] === 'A' && ranks[1] === 'A') {
+        if (values[0] === 14 && values[1] === 14) {
             return "Xì Bàn";
         }
     }
@@ -100,7 +109,7 @@ class ActionView {
                 const points = calculatePoints(cards);
                 const special = checkSpecialHand(cards);
 
-                let msg = `Bài: ${cards.join(', ')} (${points} điểm)`;
+                let msg = `Bài: ${cards.map(getCardString).join(', ')} (${points} điểm)`;
                 if (special) msg += ` - ${special}`;
 
                 const embed = new EmbedBuilder()
@@ -127,7 +136,7 @@ class ActionView {
                 const points = calculatePoints(cards);
                 const special = checkSpecialHand(cards);
 
-                let msg = `Kéo: **${newCard}**\nBài hiện tại: ${cards.join(', ')} (${points} điểm)`;
+                let msg = `Kéo: **${getCardString(newCard)}**\nBài hiện tại: ${cards.map(getCardString).join(', ')} (${points} điểm)`;
                 if (special) msg += ` - **${special}**`;
 
                 const embed = new EmbedBuilder()
@@ -235,7 +244,7 @@ async function endGameFromXjrin(channel, channelId) {
         .setTitle('🎲 KẾT QUẢ XÌ DÁCH')
         .setColor('#0099FF');
 
-    let hostMsg = `Nhà cái: ${game.hostCards.join(', ')} (${hostPoints} điểm)`;
+    let hostMsg = `Nhà cái: ${game.hostCards.map(getCardString).join(', ')} (${hostPoints} điểm)`;
     if (hostSpecial) hostMsg += ` - ${hostSpecial}`;
     
     embed.addFields({ name: '🏠 Nhà cái', value: hostMsg, inline: false });
@@ -248,7 +257,7 @@ async function endGameFromXjrin(channel, channelId) {
         const playerSpecial = checkSpecialHand(pdata.cards);
         const bet = pdata.bet;
         
-        let playerMsg = `${pdata.cards.join(', ')} (${playerPoints} điểm)`;
+        let playerMsg = `${pdata.cards.map(getCardString).join(', ')} (${playerPoints} điểm)`;
         if (playerSpecial) playerMsg += ` - ${playerSpecial}`;
         
         let outcome = '';

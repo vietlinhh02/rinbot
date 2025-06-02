@@ -82,6 +82,17 @@ class FastUtils {
     }
     
     /**
+     * Format số Rin hiển thị đẹp
+     */
+    static fastFormat(number) {
+        if (typeof number !== 'number') {
+            number = parseInt(number) || 0;
+        }
+        
+        return number.toLocaleString('vi-VN');
+    }
+    
+    /**
      * Format số tiền nhanh (không dùng toLocaleString)
      */
     static fastFormat(number) {

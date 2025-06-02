@@ -390,7 +390,7 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
-        // Xử lý interactions cho Bầu Cua (người dùng làm nhà cái)
+        // Xử lý interactions cho Bầu Cua (người dùng làm nhà cái)  
         if (interaction.customId && (
             interaction.customId.startsWith('bet_') ||
             interaction.customId === 'confirm_bet' ||
@@ -398,11 +398,15 @@ client.on('interactionCreate', async (interaction) => {
             interaction.customId === 'cancel_game' ||
             interaction.customId.startsWith('bet_modal_')
         )) {
-            const bauCuaCommand = client.commands.get('bcgo');
-            if (bauCuaCommand && bauCuaCommand.handleInteraction) {
-                await bauCuaCommand.handleInteraction(interaction);
+            // Chỉ xử lý nếu KHÔNG phải Xì Dách
+            const channelId = String(interaction.channel.id);
+            if (!global.games[channelId]) {
+                const bauCuaCommand = client.commands.get('bcgo');
+                if (bauCuaCommand && bauCuaCommand.handleInteraction) {
+                    await bauCuaCommand.handleInteraction(interaction);
+                }
+                return;
             }
-            return;
         }
 
         // Xử lý interactions cho Bầu Cua Bot (bot làm nhà cái)
@@ -477,6 +481,60 @@ client.on('interactionCreate', async (interaction) => {
             const xjbotCommand = client.commands.get('xjbot');
             if (xjbotCommand && xjbotCommand.handleInteraction) {
                 await xjbotCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
+        // Xử lý interactions cho Blackjack
+        if (interaction.customId && (
+            interaction.customId === 'blackjack_open_modal' ||
+            interaction.customId === 'blackjack_hit' ||
+            interaction.customId === 'blackjack_stand'
+        )) {
+            const blackjackCommand = client.commands.get('blackjack');
+            if (blackjackCommand) {
+                if (interaction.customId === 'blackjack_open_modal') {
+                    // This will be handled by the collector in the command
+                    return;
+                } else {
+                    // Handle hit/stand buttons - these will be handled by collectors too
+                    return;
+                }
+            }
+        }
+
+        // Xử lý modal submit cho Blackjack
+        if (interaction.isModalSubmit() && interaction.customId === 'blackjack_bet_modal') {
+            const blackjackCommand = client.commands.get('blackjack');
+            if (blackjackCommand && blackjackCommand.handleModalSubmit) {
+                await blackjackCommand.handleModalSubmit(interaction);
+            }
+            return;
+        }
+
+        // Xử lý interactions cho Slots
+        if (interaction.customId && (
+            interaction.customId === 'slots_open_modal' ||
+            interaction.customId === 'slots_play_again' ||
+            interaction.customId === 'slots_check_balance'
+        )) {
+            const slotsCommand = client.commands.get('slots');
+            if (slotsCommand) {
+                if (interaction.customId === 'slots_open_modal') {
+                    // This will be handled by the collector in the command
+                    return;
+                } else {
+                    // Handle play again/check balance - these will be handled by collectors too
+                    return;
+                }
+            }
+        }
+
+        // Xử lý modal submit cho Slots
+        if (interaction.isModalSubmit() && interaction.customId === 'slots_bet_modal') {
+            const slotsCommand = client.commands.get('slots');
+            if (slotsCommand && slotsCommand.handleModalSubmit) {
+                await slotsCommand.handleModalSubmit(interaction);
             }
             return;
         }
