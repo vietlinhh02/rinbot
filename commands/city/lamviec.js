@@ -217,8 +217,8 @@ module.exports = {
             });
 
             // Xác định có thể trộm gì
-            const canStealTrees = stealableTrees.length > 0 && hasHouse; // CHỈ trộm cây khi có nhà
-            const canStealHouseMoney = canStealMoney && hasHouse && !hasStealenMoneyToday;
+            const canStealTrees = stealableTrees.length > 0 ; // CHỈ trộm cây khi có nhà
+            const canStealHouseMoney = canStealMoney  && !hasStealenMoneyToday;
 
             if (!canStealTrees && !canStealHouseMoney) {
                 let reason = '';
