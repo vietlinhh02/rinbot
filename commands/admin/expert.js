@@ -1,5 +1,6 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { Expert, Consultation } = require('../../models/Expert');
+const config = require('../../config/config.js');
 
 // Các lĩnh vực chuyên môn
 const SPECIALTIES = {
@@ -16,11 +17,14 @@ const SPECIALTIES = {
 module.exports = {
     name: 'expert',
     description: 'Quản lý chuyên gia tư vấn (Admin only)',
-    async execute(message, args) {
+    async execute(message, args, client) {
         try {
-            // Kiểm tra quyền admin
-            if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return await message.reply('❌ Chỉ admin mới có thể sử dụng lệnh này!');
+            // Kiểm tra quyền admin hoặc owner
+            const isOwner = message.author.id === config.ownerId;
+            const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+            
+            if (!isAdmin && !isOwner) {
+                return await message.reply('❌ Chỉ admin hoặc chủ bot mới có thể sử dụng lệnh này!');
             }
 
             if (!args[0]) {

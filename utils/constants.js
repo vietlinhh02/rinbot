@@ -172,6 +172,45 @@ const PET_INFO = {
 };
 
 // City system constants - Bổ sung thêm cho hệ thống City
+const HOUSE_TYPES = {
+    "nhatro": {
+        name: "Nhà Trọ",
+        price: 1000,
+        rentDuration: 7, // 7 ngày
+        repairCost: 100,
+        maxHealth: 100,
+        emoji: "🏠",
+        description: "Nhà trọ cơ bản, cho phép làm việc trộm cắp"
+    },
+    "nhatuong": {
+        name: "Nhà Tường",
+        price: 3000,
+        rentDuration: 14, // 14 ngày
+        repairCost: 300,
+        maxHealth: 100,
+        emoji: "🏡",
+        description: "Nhà tường kiên cố, cho phép làm việc nhà báo và MC"
+    },
+    "nhalau": {
+        name: "Nhà Lầu",
+        price: 10000,
+        rentDuration: 30, // 30 ngày
+        repairCost: 1000,
+        maxHealth: 100,
+        emoji: "🏘️",
+        description: "Nhà lầu sang trọng, cho phép làm việc nhà báo và MC"
+    },
+    "bietthu": {
+        name: "Biệt Thự",
+        price: 50000,
+        rentDuration: 60, // 60 ngày
+        repairCost: 5000,
+        maxHealth: 100,
+        emoji: "🏰",
+        description: "Biệt thự cao cấp, cho phép làm tất cả các nghề"
+    }
+};
+
 const JOB_TYPES = {
     "trom": {
         name: "Trộm",
@@ -351,6 +390,7 @@ module.exports = {
     CHANCE_CARDS,
     COMMUNITY_CHEST_CARDS,
     HOUSE_IMAGES,
+    HOUSE_TYPES,
     JOB_IMAGES,
     JOB_TYPES,
     MISSIONS,

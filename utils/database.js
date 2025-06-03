@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Pet = require('../models/Pet');
 const Tree = require('../models/Tree');
-const CityUser = require('../models/CityUser');
+const { CityUser } = require('../models/CityUser');
 const Guild = require('../models/Guild');
 
 // Kết nối MongoDB

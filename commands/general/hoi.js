@@ -392,7 +392,18 @@ module.exports = {
             }
             
             // Lấy câu trả lời
-            const answer = interaction.fields.getTextInputValue('answer_input');
+            let answer;
+            try {
+                answer = interaction.fields.getTextInputValue('answer_input');
+                console.log(`Đã lấy được câu trả lời, độ dài: ${answer?.length || 0}`);
+            } catch (fieldError) {
+                console.error('Lỗi khi lấy câu trả lời:', fieldError);
+                return await interaction.reply({ 
+                    content: '❌ Không thể đọc nội dung câu trả lời. Vui lòng thử lại!', 
+                    ephemeral: true 
+                });
+            }
+            
             if (!answer || answer.trim().length < 10) {
                 return await interaction.reply({ 
                     content: '❌ Câu trả lời quá ngắn! Vui lòng viết chi tiết hơn.', 
@@ -401,11 +412,13 @@ module.exports = {
             }
 
             // Kiểm tra lại expert
+            console.log(`Kiểm tra chuyên gia: ${interaction.user.id}`);
             const expert = await Expert.findOne({ 
                 userId: interaction.user.id
             });
 
             if (!expert) {
+                console.log('Không tìm thấy chuyên gia với ID:', interaction.user.id);
                 return await interaction.reply({ 
                     content: '❌ Bạn không phải là chuyên gia trong hệ thống!', 
                     ephemeral: true 
@@ -413,6 +426,7 @@ module.exports = {
             }
             
             if (expert.status !== 'active') {
+                console.log('Chuyên gia không active:', expert.status);
                 return await interaction.reply({ 
                     content: '❌ Tài khoản chuyên gia của bạn đang bị vô hiệu hóa!', 
                     ephemeral: true 
@@ -426,6 +440,7 @@ module.exports = {
             });
 
             if (!consultation) {
+                console.log('Không tìm thấy consultation với shortId:', shortId);
                 return await interaction.reply({ 
                     content: '❌ Không tìm thấy câu hỏi này! Có thể đã bị xóa.', 
                     ephemeral: true 
@@ -433,6 +448,7 @@ module.exports = {
             }
             
             if (consultation.status !== 'published') {
+                console.log('Consultation không ở trạng thái published:', consultation.status);
                 return await interaction.reply({ 
                     content: `❌ Câu hỏi này đã được trả lời hoặc không còn khả dụng (status: ${consultation.status})!`, 
                     ephemeral: true 
@@ -463,7 +479,16 @@ module.exports = {
                 // Update public message
                 console.log('Đang cập nhật tin nhắn công khai...');
                 const channel = await interaction.client.channels.fetch(consultation.publicChannelId);
+                if (!channel) {
+                    console.error('Không tìm thấy channel:', consultation.publicChannelId);
+                    throw new Error('Không tìm thấy channel');
+                }
+                
                 const publicMessage = await channel.messages.fetch(consultation.publicMessageId);
+                if (!publicMessage) {
+                    console.error('Không tìm thấy tin nhắn:', consultation.publicMessageId);
+                    throw new Error('Không tìm thấy tin nhắn');
+                }
 
                 const answeredEmbed = new EmbedBuilder()
                     .setTitle('✅ CÂU HỎI ĐÃ ĐƯỢC TRẢ LỜI')
@@ -489,6 +514,7 @@ module.exports = {
                     embeds: [answeredEmbed], 
                     components: [disabledRow] 
                 });
+                console.log('Đã cập nhật tin nhắn công khai thành công');
             } catch (messageError) {
                 console.error('Lỗi cập nhật tin nhắn công khai:', messageError);
                 await interaction.reply({ 
@@ -514,6 +540,7 @@ module.exports = {
                     .setFooter({ text: 'Hệ thống tư vấn chuyên gia • Chỉ mang tính tham khảo' });
 
                 await userWhoAsked.send({ embeds: [dmEmbed] });
+                console.log('Đã gửi DM cho người hỏi thành công');
             } catch (dmError) {
                 console.log('Không thể gửi DM cho người hỏi:', dmError.message);
                 // Không cần phản hồi lỗi này cho chuyên gia

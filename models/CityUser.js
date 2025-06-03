@@ -13,9 +13,16 @@ const cityUserSchema = new mongoose.Schema({
     dailyVoiceMinutes: { type: Number, default: 0 },
     jailedUntil: Date,
     jailedBy: String,
-    lastRepair: Date
+    lastRepair: Date,
+    // Thêm các trường cho hệ thống nhà
+    houseId: String, // ID loại nhà
+    houseHealth: { type: Number, default: 100 }, // Độ bền nhà (%)
+    houseRentedUntil: Date, // Thời gian thuê nhà hết hạn
+    dailyMoneySteal: { type: Number, default: 0 } // Số tiền đã trộm trong ngày
 }, {
     timestamps: true
 });
 
-module.exports = mongoose.model('CityUser', cityUserSchema); 
+const CityUser = mongoose.model('CityUser', cityUserSchema);
+
+module.exports = { CityUser }; 

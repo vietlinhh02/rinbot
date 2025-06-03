@@ -71,17 +71,11 @@ class ExpertHandler {
 
             // Tìm consultation - hỗ trợ cả consultationId và shortId
             let consultation = await Consultation.findOne({ 
-                consultationId,
-                status: 'assigned'
+                $or: [
+                    { consultationId: consultationId, status: 'assigned' },
+                    { shortId: consultationId, status: 'published' }
+                ]
             });
-            
-            // Nếu không tìm thấy với consultationId, thử tìm với shortId
-            if (!consultation) {
-                consultation = await Consultation.findOne({
-                    shortId: consultationId,
-                    status: 'published'
-                });
-            }
 
             if (!consultation) {
                 await message.reply('❌ Không tìm thấy câu hỏi với mã này hoặc câu hỏi đã được trả lời!');
@@ -140,7 +134,7 @@ class ExpertHandler {
                 
                 const answerEmbed = new EmbedBuilder()
                     .setTitle('📝 CHUYÊN GIA ĐÃ TRẢ LỜI')
-                    .setDescription(`**Mã số:** \`${consultationId}\`\n` +
+                    .setDescription(`**Mã số:** \`${consultation.shortId || consultationId}\`\n` +
                         `**Thể loại:** ${CATEGORIES[consultation.category]}\n\n` +
                         `**Câu hỏi của bạn:**\n${consultation.question}\n\n` +
                         `**💡 Câu trả lời từ chuyên gia:**\n${answer}\n\n` +
@@ -154,7 +148,7 @@ class ExpertHandler {
                 // Thông báo cho chuyên gia đã gửi thành công
                 const successEmbed = new EmbedBuilder()
                     .setTitle('✅ Đã gửi câu trả lời')
-                    .setDescription(`**Mã số:** \`${consultationId}\`\n` +
+                    .setDescription(`**Mã số:** \`${consultation.shortId || consultationId}\`\n` +
                         `**Câu trả lời:** ${answer.substring(0, 100)}${answer.length > 100 ? '...' : ''}\n\n` +
                         '📱 Người hỏi đã nhận được câu trả lời!\n' +
                         '🔒 Hoàn toàn ẩn danh')
@@ -169,7 +163,7 @@ class ExpertHandler {
                 // Vẫn thông báo cho chuyên gia rằng đã trả lời
                 const partialSuccessEmbed = new EmbedBuilder()
                     .setTitle('⚠️ Đã lưu câu trả lời')
-                    .setDescription(`**Mã số:** \`${consultationId}\`\n\n` +
+                    .setDescription(`**Mã số:** \`${consultation.shortId || consultationId}\`\n\n` +
                         '✅ Câu trả lời đã được lưu\n' +
                         '⚠️ Không thể gửi trực tiếp cho người hỏi (có thể đã tắt DM)\n' +
                         '📝 Họ sẽ nhận được thông báo khi kiểm tra')

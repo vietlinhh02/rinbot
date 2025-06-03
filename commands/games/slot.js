@@ -56,9 +56,9 @@ module.exports = {
 
         // Kiểm tra thời gian nghỉ (reset sau 24h)
         const now = Date.now();
-        const resetThreshold = 24 * 60 * 60 * 1000; // 24 giờ
+        const resetThreshold = 4 * 60 * 60 * 1000; // 6 giờ
         if (!last_slot_play || now - last_slot_play > resetThreshold) {
-            slot_plays = 0; // Reset số lần quay nếu nghỉ quá 24h
+            slot_plays = 0; // Reset số lần quay nếu nghỉ quá 6
         }
         
         slot_plays += 1;
@@ -71,8 +71,8 @@ module.exports = {
 
         // Tính xác suất nhà cái thắng dựa trên số lần chơi
         let houseWinChance = 0.5;
-        if (slot_plays <= 3) houseWinChance = 0.2;         // 5 lần đầu: 40% thua
-        else if (slot_plays <= 10) houseWinChance = 0.4;   // 6-10: 50% thua  
+        if (slot_plays <= 3) houseWinChance = 0.3;         // 5 lần đầu: 40% thua
+        else if (slot_plays <= 10) houseWinChance = 0.45;   // 6-10: 50% thua  
         else if (slot_plays <= 20) houseWinChance = 0.55;  // 11-20: 55% thua
         else if (slot_plays <= 50) houseWinChance = 0.6;   // 21-50: 60% thua
         else houseWinChance = 0.7;                         // 50+: 70% thua
