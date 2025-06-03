@@ -1,16 +1,21 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const Giveaway = require('../../models/Giveaway');
+const { getUserRin, updateUserRin } = require('../../utils/database');
+const config = require('../../config/config.js');
 
 // Lưu trữ giveaway đang hoạt động
 const activeGiveaways = new Map();
 
 module.exports = {
     name: 'giveaway',
-    description: 'Tạo giveaway',
+    description: 'Tạo giveaway cho thành viên',
     async execute(message, args) {
-        // Kiểm tra quyền admin
-        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return message.reply('⛔ Chỉ admin mới tạo được giveaway!');
+        // Kiểm tra quyền admin hoặc owner
+        const isOwner = config.isOwner(message.author.id);
+        const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+        
+        if (!isAdmin && !isOwner) {
+            return await message.reply('❌ Chỉ admin hoặc chủ bot mới có thể tạo giveaway!');
         }
 
         if (args.length < 3) {
@@ -126,8 +131,12 @@ module.exports = {
 
     // Command để chỉ định người thắng
     async executePickWinner(message, args) {
-        if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-            return message.reply('⛔ Chỉ admin mới được chỉ định người thắng!');
+        // Kiểm tra quyền admin hoặc owner
+        const isOwner = config.isOwner(message.author.id);
+        const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+        
+        if (!isAdmin && !isOwner) {
+            return message.reply('❌ Chỉ admin hoặc chủ bot mới được chỉ định người thắng!');
         }
 
         if (args.length < 2) {
@@ -312,6 +321,21 @@ module.exports = {
             console.log(`✅ Đã load ${activeDbGiveaways.length} giveaway đang hoạt động`);
         } catch (error) {
             console.error('Lỗi load giveaway:', error);
+        }
+    },
+
+    async endGiveaway(message, args) {
+        try {
+            // Kiểm tra quyền admin hoặc owner
+            const isOwner = config.isOwner(message.author.id);
+            const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+            
+            if (!isAdmin && !isOwner) {
+                return await message.reply('❌ Chỉ admin hoặc chủ bot mới có thể kết thúc giveaway!');
+            }
+        } catch (error) {
+            console.error('Lỗi xử lý endGiveaway:', error);
+            return message.reply('❌ Đã xảy ra lỗi khi kết thúc giveaway!');
         }
     }
 }; 

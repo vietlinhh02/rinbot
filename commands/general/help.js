@@ -1,6 +1,7 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getGuildPrefix } = require('../../utils/database');
-const { PermissionFlagsBits } = require('discord.js');
+const { getPrefix } = require('../../utils/prefixHelper');
+const config = require('../../config/config.js');
 
 module.exports = {
     name: 'rinhelp',
@@ -356,9 +357,12 @@ module.exports = {
         }
 
         if (topic === 'admin') {
-            // Kiểm tra quyền admin
-            if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                return message.reply('⛔ Bạn không có quyền xem hướng dẫn admin!');
+            // Kiểm tra quyền admin hoặc owner
+            const isOwner = config.isOwner(message.author.id);
+            const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
+            
+            if (!isAdmin && !isOwner) {
+                return message.reply('❌ Bạn không có quyền xem hướng dẫn admin!');
             }
             
             const embed = new EmbedBuilder()
@@ -424,4 +428,4 @@ module.exports = {
         
         return await message.reply({ embeds: [embed] });
     }
-}; 
+};

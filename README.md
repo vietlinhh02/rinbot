@@ -86,6 +86,9 @@ DISCORD_OWNER_ID=your_discord_user_id
 # BẮT BUỘC: GitHub Token cho Private Repository
 GITHUB_TOKEN=your_github_personal_access_token
 GITHUB_USERNAME=your_github_username
+
+# BẮT BUỘC: Nhiều owner (khuyến nghị)
+DISCORD_OWNER_IDS=123456789012345678,987654321098765432,567890123456789012
 ```
 
 ### **📦 Setup Private Repository** 

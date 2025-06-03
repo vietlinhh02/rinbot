@@ -20,7 +20,7 @@ module.exports = {
     async execute(message, args, client) {
         try {
             // Kiểm tra quyền admin hoặc owner
-            const isOwner = message.author.id === config.ownerId;
+            const isOwner = config.isOwner(message.author.id);
             const isAdmin = message.member.permissions.has(PermissionFlagsBits.Administrator);
             
             if (!isAdmin && !isOwner) {
