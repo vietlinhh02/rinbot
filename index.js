@@ -382,12 +382,20 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.customId && (
             interaction.customId.startsWith('ask_expert_') ||
             interaction.customId.startsWith('question_modal_') ||
-            interaction.customId.startsWith('expert_reply_') ||
-            interaction.customId.startsWith('expert_answer_')
+            interaction.customId.startsWith('expert_reply_')
         )) {
             const hoiCommand = client.commands.get('hoi');
             if (hoiCommand && hoiCommand.handleInteraction) {
                 await hoiCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+        
+        // Xử lý modal submit cho câu trả lời chuyên gia
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('expert_answer_')) {
+            const hoiCommand = client.commands.get('hoi');
+            if (hoiCommand && hoiCommand.handleAnswerSubmit) {
+                await hoiCommand.handleAnswerSubmit(interaction);
             }
             return;
         }

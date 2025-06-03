@@ -69,11 +69,19 @@ class ExpertHandler {
                 return true;
             }
 
-            // Tìm consultation
-            const consultation = await Consultation.findOne({ 
+            // Tìm consultation - hỗ trợ cả consultationId và shortId
+            let consultation = await Consultation.findOne({ 
                 consultationId,
                 status: 'assigned'
             });
+            
+            // Nếu không tìm thấy với consultationId, thử tìm với shortId
+            if (!consultation) {
+                consultation = await Consultation.findOne({
+                    shortId: consultationId,
+                    status: 'published'
+                });
+            }
 
             if (!consultation) {
                 await message.reply('❌ Không tìm thấy câu hỏi với mã này hoặc câu hỏi đã được trả lời!');
@@ -88,6 +96,43 @@ class ExpertHandler {
                 expertUserId: message.author.id
             };
             await consultation.save();
+            
+            // Nếu là câu hỏi public, cập nhật tin nhắn công khai
+            if (consultation.publicMessageId && consultation.publicChannelId) {
+                try {
+                    const channel = await this.client.channels.fetch(consultation.publicChannelId);
+                    const publicMessage = await channel.messages.fetch(consultation.publicMessageId);
+                    
+                    const { ButtonBuilder, ActionRowBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+                    
+                    const answeredEmbed = new EmbedBuilder()
+                        .setTitle('✅ CÂU HỎI ĐÃ ĐƯỢC TRẢ LỜI')
+                        .setDescription(`**Mã:** \`${consultation.shortId || consultationId}\`\n` +
+                            `**Thể loại:** ${CATEGORIES[consultation.category]}\n` +
+                            `**Câu hỏi:**\n${consultation.question}\n\n` +
+                            `**💡 Câu trả lời từ chuyên gia:**\n${answer}\n\n` +
+                            '🔒 **Hoàn toàn ẩn danh** - Chuyên gia đã trả lời một cách chuyên nghiệp')
+                        .setColor('#00FF00')
+                        .setFooter({ text: 'Đã trả lời • Chỉ mang tính tham khảo' })
+                        .setTimestamp();
+
+                    // Disable button
+                    const disabledButton = new ButtonBuilder()
+                        .setCustomId(`expert_reply_${consultation.shortId || consultationId}_disabled`)
+                        .setLabel('✅ Đã trả lời')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(true);
+
+                    const disabledRow = new ActionRowBuilder().addComponents(disabledButton);
+
+                    await publicMessage.edit({ 
+                        embeds: [answeredEmbed], 
+                        components: [disabledRow] 
+                    });
+                } catch (updateError) {
+                    console.error('Lỗi cập nhật tin nhắn công khai:', updateError);
+                }
+            }
 
             // Gửi thông báo cho user (người hỏi)
             try {

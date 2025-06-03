@@ -100,9 +100,7 @@ module.exports = {
             return await this.handleExpertReply(interaction);
         }
 
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('expert_answer_')) {
-            return await this.handleAnswerSubmit(interaction);
-        }
+        // Xử lý modal submit cho expert_answer_ đã được chuyển sang phần riêng biệt trong index.js
 
         if (interaction.isModalSubmit() && interaction.customId.startsWith('question_modal_')) {
             try {
@@ -218,6 +216,9 @@ module.exports = {
             await Consultation.findByIdAndUpdate(consultation._id, {
                 publicMessageId: publicMessage.id
             });
+            
+            // Thông báo cho tất cả chuyên gia phù hợp với lĩnh vực này
+            await this.notifyExperts(client, consultation, category, shortId, channel.guild.id);
 
         } catch (error) {
             console.error('Lỗi gửi public:', error);
@@ -278,94 +279,168 @@ module.exports = {
     // Xử lý chuyên gia reply qua button
     async handleExpertReply(interaction) {
         try {
+            console.log('Chuyên gia đang mở form trả lời...');
             const shortId = interaction.customId.replace('expert_reply_', '');
             
             // Kiểm tra user có phải chuyên gia không
             const expert = await Expert.findOne({ 
-                userId: interaction.user.id, 
-                status: 'active' 
+                userId: interaction.user.id
             });
             
             if (!expert) {
                 return await interaction.reply({ 
-                    content: '❌ Chỉ chuyên gia mới có thể trả lời!', 
+                    content: '❌ Bạn không phải là chuyên gia trong hệ thống!', 
+                    ephemeral: true 
+                });
+            }
+            
+            if (expert.status !== 'active') {
+                return await interaction.reply({ 
+                    content: '❌ Tài khoản chuyên gia của bạn đang bị vô hiệu hóa!', 
                     ephemeral: true 
                 });
             }
 
             // Tìm consultation
+            console.log(`Đang tìm consultation với shortId: ${shortId}`);
             const consultation = await Consultation.findOne({ 
-                shortId: shortId,
-                status: 'published'
+                shortId: shortId
             });
 
             if (!consultation) {
                 return await interaction.reply({ 
-                    content: '❌ Không tìm thấy câu hỏi này hoặc đã được trả lời!', 
+                    content: '❌ Không tìm thấy câu hỏi này! Có thể đã bị xóa.', 
+                    ephemeral: true 
+                });
+            }
+            
+            if (consultation.status !== 'published') {
+                return await interaction.reply({ 
+                    content: `❌ Câu hỏi này đã được trả lời hoặc không còn khả dụng (status: ${consultation.status})!`, 
                     ephemeral: true 
                 });
             }
 
             // Tạo modal để nhập câu trả lời
-            const modal = new ModalBuilder()
-                .setCustomId(`expert_answer_${shortId}`)
-                .setTitle('Trả lời câu hỏi (Ẩn danh)');
+            try {
+                console.log('Đang tạo modal trả lời...');
+                const modal = new ModalBuilder()
+                    .setCustomId(`expert_answer_${shortId}`)
+                    .setTitle('Trả lời câu hỏi (Ẩn danh)');
 
-            const answerInput = new TextInputBuilder()
-                .setCustomId('answer_input')
-                .setLabel('Câu trả lời của bạn:')
-                .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder('Nhập câu trả lời chi tiết, chuyên nghiệp... (Không giới hạn độ dài)')
-                .setRequired(true)
-                .setMinLength(20);
+                const answerInput = new TextInputBuilder()
+                    .setCustomId('answer_input')
+                    .setLabel('Câu trả lời của bạn:')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Nhập câu trả lời chi tiết, chuyên nghiệp... (Không giới hạn độ dài)')
+                    .setRequired(true)
+                    .setMinLength(20);
 
-            const row = new ActionRowBuilder().addComponents(answerInput);
-            modal.addComponents(row);
+                const row = new ActionRowBuilder().addComponents(answerInput);
+                modal.addComponents(row);
 
-            await interaction.showModal(modal);
+                await interaction.showModal(modal);
+                console.log('Đã hiển thị modal trả lời thành công');
+            } catch (modalError) {
+                console.error('Lỗi hiển thị modal:', modalError);
+                await interaction.reply({ 
+                    content: `❌ Không thể hiển thị form trả lời: ${modalError.message}`, 
+                    ephemeral: true 
+                });
+            }
 
         } catch (error) {
             console.error('Lỗi expert reply:', error);
-            await interaction.reply({ 
-                content: '❌ Có lỗi xảy ra!', 
-                ephemeral: true 
-            });
+            try {
+                if (!interaction.replied) {
+                    await interaction.reply({ 
+                        content: `❌ Có lỗi xảy ra: ${error.message}`, 
+                        ephemeral: true 
+                    });
+                }
+            } catch (replyError) {
+                console.error('Không thể phản hồi lỗi:', replyError);
+            }
         }
     },
 
     // Xử lý submit answer
     async handleAnswerSubmit(interaction) {
         try {
+            console.log('Đang xử lý câu trả lời chuyên gia...');
+            
+            // Kiểm tra interaction
+            if (!interaction.isModalSubmit()) {
+                console.error('Interaction không phải modal submit');
+                return await interaction.reply({ 
+                    content: '❌ Có lỗi xảy ra: Không phải modal submit', 
+                    ephemeral: true 
+                });
+            }
+            
+            // Lấy shortId từ customId
             const shortId = interaction.customId.replace('expert_answer_', '');
+            console.log(`ShortID: ${shortId}`);
+            
+            // Kiểm tra fields
+            if (!interaction.fields || !interaction.fields.getTextInputValue) {
+                console.error('Không tìm thấy fields trong modal submit');
+                return await interaction.reply({ 
+                    content: '❌ Có lỗi xảy ra: Không tìm thấy nội dung câu trả lời', 
+                    ephemeral: true 
+                });
+            }
+            
+            // Lấy câu trả lời
             const answer = interaction.fields.getTextInputValue('answer_input');
+            if (!answer || answer.trim().length < 10) {
+                return await interaction.reply({ 
+                    content: '❌ Câu trả lời quá ngắn! Vui lòng viết chi tiết hơn.', 
+                    ephemeral: true 
+                });
+            }
 
             // Kiểm tra lại expert
             const expert = await Expert.findOne({ 
-                userId: interaction.user.id, 
-                status: 'active' 
+                userId: interaction.user.id
             });
 
             if (!expert) {
                 return await interaction.reply({ 
-                    content: '❌ Chỉ chuyên gia mới có thể trả lời!', 
+                    content: '❌ Bạn không phải là chuyên gia trong hệ thống!', 
+                    ephemeral: true 
+                });
+            }
+            
+            if (expert.status !== 'active') {
+                return await interaction.reply({ 
+                    content: '❌ Tài khoản chuyên gia của bạn đang bị vô hiệu hóa!', 
                     ephemeral: true 
                 });
             }
 
             // Tìm consultation
+            console.log(`Đang tìm consultation với shortId: ${shortId}`);
             const consultation = await Consultation.findOne({ 
-                shortId: shortId,
-                status: 'published'
+                shortId: shortId
             });
 
             if (!consultation) {
                 return await interaction.reply({ 
-                    content: '❌ Câu hỏi không tồn tại hoặc đã được trả lời!', 
+                    content: '❌ Không tìm thấy câu hỏi này! Có thể đã bị xóa.', 
+                    ephemeral: true 
+                });
+            }
+            
+            if (consultation.status !== 'published') {
+                return await interaction.reply({ 
+                    content: `❌ Câu hỏi này đã được trả lời hoặc không còn khả dụng (status: ${consultation.status})!`, 
                     ephemeral: true 
                 });
             }
 
             // Cập nhật consultation
+            console.log('Đang cập nhật consultation...');
             await Consultation.findByIdAndUpdate(consultation._id, {
                 status: 'answered',
                 answer: answer,
@@ -375,37 +450,57 @@ module.exports = {
                 }
             });
 
-            // Update public message
-            const channel = await interaction.client.channels.fetch(consultation.publicChannelId);
-            const publicMessage = await channel.messages.fetch(consultation.publicMessageId);
+            // Kiểm tra publicChannelId và publicMessageId
+            if (!consultation.publicChannelId || !consultation.publicMessageId) {
+                console.error('Thiếu publicChannelId hoặc publicMessageId');
+                return await interaction.reply({ 
+                    content: '✅ Đã lưu câu trả lời thành công, nhưng không thể cập nhật tin nhắn công khai!', 
+                    ephemeral: true 
+                });
+            }
 
-            const answeredEmbed = new EmbedBuilder()
-                .setTitle('✅ CÂU HỎI ĐÃ ĐƯỢC TRẢ LỜI')
-                .setDescription(`**Mã:** \`${shortId}\`\n` +
-                    `**Thể loại:** ${CATEGORIES[consultation.category]}\n` +
-                    `**Câu hỏi:**\n${consultation.question}\n\n` +
-                    `**💡 Câu trả lời từ chuyên gia:**\n${answer}\n\n` +
-                    '🔒 **Hoàn toàn ẩn danh** - Chuyên gia đã trả lời một cách chuyên nghiệp')
-                .setColor('#00FF00')
-                .setFooter({ text: 'Đã trả lời • Chỉ mang tính tham khảo' })
-                .setTimestamp();
+            try {
+                // Update public message
+                console.log('Đang cập nhật tin nhắn công khai...');
+                const channel = await interaction.client.channels.fetch(consultation.publicChannelId);
+                const publicMessage = await channel.messages.fetch(consultation.publicMessageId);
 
-            // Disable button
-            const disabledButton = new ButtonBuilder()
-                .setCustomId(`expert_reply_${shortId}_disabled`)
-                .setLabel('✅ Đã trả lời')
-                .setStyle(ButtonStyle.Success)
-                .setDisabled(true);
+                const answeredEmbed = new EmbedBuilder()
+                    .setTitle('✅ CÂU HỎI ĐÃ ĐƯỢC TRẢ LỜI')
+                    .setDescription(`**Mã:** \`${shortId}\`\n` +
+                        `**Thể loại:** ${CATEGORIES[consultation.category]}\n` +
+                        `**Câu hỏi:**\n${consultation.question}\n\n` +
+                        `**💡 Câu trả lời từ chuyên gia:**\n${answer}\n\n` +
+                        '🔒 **Hoàn toàn ẩn danh** - Chuyên gia đã trả lời một cách chuyên nghiệp')
+                    .setColor('#00FF00')
+                    .setFooter({ text: 'Đã trả lời • Chỉ mang tính tham khảo' })
+                    .setTimestamp();
 
-            const disabledRow = new ActionRowBuilder().addComponents(disabledButton);
+                // Disable button
+                const disabledButton = new ButtonBuilder()
+                    .setCustomId(`expert_reply_${shortId}_disabled`)
+                    .setLabel('✅ Đã trả lời')
+                    .setStyle(ButtonStyle.Success)
+                    .setDisabled(true);
 
-            await publicMessage.edit({ 
-                embeds: [answeredEmbed], 
-                components: [disabledRow] 
-            });
+                const disabledRow = new ActionRowBuilder().addComponents(disabledButton);
+
+                await publicMessage.edit({ 
+                    embeds: [answeredEmbed], 
+                    components: [disabledRow] 
+                });
+            } catch (messageError) {
+                console.error('Lỗi cập nhật tin nhắn công khai:', messageError);
+                await interaction.reply({ 
+                    content: '✅ Đã lưu câu trả lời thành công, nhưng không thể cập nhật tin nhắn công khai!', 
+                    ephemeral: true 
+                });
+                return;
+            }
 
             // Gửi DM cho người hỏi
             try {
+                console.log('Đang gửi DM cho người hỏi...');
                 const userWhoAsked = await interaction.client.users.fetch(consultation.userId);
                 
                 const dmEmbed = new EmbedBuilder()
@@ -421,28 +516,104 @@ module.exports = {
                 await userWhoAsked.send({ embeds: [dmEmbed] });
             } catch (dmError) {
                 console.log('Không thể gửi DM cho người hỏi:', dmError.message);
+                // Không cần phản hồi lỗi này cho chuyên gia
             }
-
-            // Thông báo thành công cho chuyên gia
-            await interaction.reply({ 
-                content: '✅ Đã gửi câu trả lời thành công! Câu trả lời đã được đăng công khai.', 
-                ephemeral: true 
-            });
 
             // Tăng counter cho expert
             await Expert.findByIdAndUpdate(expert._id, {
                 $inc: { totalConsultations: 1 }
             });
 
-        } catch (error) {
-            console.error('Lỗi submit answer:', error);
+            // Thông báo thành công cho chuyên gia
+            console.log('Hoàn tất xử lý câu trả lời');
             await interaction.reply({ 
-                content: '❌ Có lỗi xảy ra khi gửi câu trả lời!', 
+                content: '✅ Đã gửi câu trả lời thành công! Câu trả lời đã được đăng công khai.', 
                 ephemeral: true 
             });
+
+        } catch (error) {
+            console.error('Lỗi submit answer:', error);
+            try {
+                if (!interaction.replied) {
+                    await interaction.reply({ 
+                        content: `❌ Có lỗi xảy ra khi gửi câu trả lời: ${error.message}`, 
+                        ephemeral: true 
+                    });
+                }
+            } catch (replyError) {
+                console.error('Không thể phản hồi lỗi:', replyError);
+            }
         }
     },
 
+    // Gửi thông báo cho tất cả chuyên gia phù hợp
+    async notifyExperts(client, consultation, category, shortId, guildId) {
+        try {
+            console.log(`Đang thông báo cho chuyên gia về câu hỏi ${shortId}...`);
+            
+            // Tìm tất cả chuyên gia phù hợp với lĩnh vực này
+            const experts = await Expert.find({
+                status: 'active',
+                isAvailable: true,
+                $or: [
+                    { specialties: category },
+                    { specialties: 'general' }
+                ]
+            });
+            
+            if (experts.length === 0) {
+                console.log('Không tìm thấy chuyên gia phù hợp để thông báo');
+                return;
+            }
+            
+            console.log(`Tìm thấy ${experts.length} chuyên gia phù hợp`);
+            
+            // Lấy thông tin guild và channel
+            const guild = await client.guilds.fetch(guildId);
+            const { getGuildConfig } = require('../../utils/database');
+            const config = await getGuildConfig(guildId);
+            const channelId = config?.expertPublicRoom;
+            
+            // Tạo embed thông báo
+            const notifyEmbed = new EmbedBuilder()
+                .setTitle('🔔 CÓ CÂU HỎI MỚI CẦN TƯ VẤN!')
+                .setDescription(`**Mã:** \`${shortId}\`\n` +
+                    `**Thể loại:** ${CATEGORIES[category]}\n` +
+                    `**Câu hỏi:**\n${consultation.question}\n\n` +
+                    '**💬 Cách trả lời:**\n' +
+                    '1️⃣ **Trả lời trực tiếp:** Reply tin nhắn này với format:\n' +
+                    `\`!reply ${shortId} [câu trả lời của bạn]\`\n\n` +
+                    `2️⃣ **Trả lời trong kênh:** ${channelId ? `<#${channelId}>` : 'Kênh public'}\n` +
+                    '• Nhấn nút "📝 Trả lời" trong câu hỏi công khai\n\n' +
+                    '🔒 **Hoàn toàn ẩn danh** - Bạn và người hỏi không biết nhau')
+                .setColor('#FFA500')
+                .setFooter({ text: `${guild.name} • Hệ thống tư vấn chuyên gia` })
+                .setTimestamp();
+            
+            // Gửi thông báo cho từng chuyên gia
+            let sentCount = 0;
+            for (const expert of experts) {
+                try {
+                    const expertUser = await client.users.fetch(expert.userId);
+                    await expertUser.send({ embeds: [notifyEmbed] });
+                    sentCount++;
+                } catch (dmError) {
+                    console.log(`Không thể gửi DM cho chuyên gia ${expert.username}:`, dmError.message);
+                }
+            }
+            
+            console.log(`Đã gửi thông báo cho ${sentCount}/${experts.length} chuyên gia`);
+            
+            // Lưu danh sách chuyên gia đã thông báo
+            await Consultation.findByIdAndUpdate(consultation._id, {
+                notifiedExperts: experts.map(e => e.userId)
+            });
+            
+        } catch (error) {
+            console.error('Lỗi thông báo cho chuyên gia:', error);
+        }
+    },
+    
     // Tạo mã theo format của guild
     async generateCodeForGuild(guildId) {
         try {

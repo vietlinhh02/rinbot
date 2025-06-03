@@ -37,7 +37,8 @@ const consultationSchema = new mongoose.Schema({
     expertResponse: {
         answeredAt: { type: Date },
         expertUserId: { type: String }
-    }
+    },
+    notifiedExperts: [{ type: String }] // Danh sách ID của các chuyên gia đã được thông báo
 }, {
     timestamps: true
 });
