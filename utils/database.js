@@ -211,6 +211,34 @@ const getAllGuildPrefixes = async () => {
     }
 };
 
+// Lấy cấu hình của guild
+const getGuildConfig = async (guildId) => {
+    try {
+        const guild = await Guild.findOne({ guildId });
+        if (!guild) {
+            return null;
+        }
+        return guild;
+    } catch (error) {
+        console.error('Lỗi getGuildConfig:', error);
+        return null;
+    }
+};
+
+// Cập nhật cấu hình của guild
+const updateGuildConfig = async (guildId, updateData) => {
+    try {
+        return await Guild.findOneAndUpdate(
+            { guildId },
+            updateData,
+            { new: true, upsert: true }
+        );
+    } catch (error) {
+        console.error('Lỗi updateGuildConfig:', error);
+        return null;
+    }
+};
+
 module.exports = {
     connectDB,
     getUserRin,
@@ -227,5 +255,7 @@ module.exports = {
     updateAllCityUsers,
     getGuildPrefix,
     setGuildPrefix,
-    getAllGuildPrefixes
+    getAllGuildPrefixes,
+    getGuildConfig,
+    updateGuildConfig
 }; 

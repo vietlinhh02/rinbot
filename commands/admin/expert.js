@@ -27,9 +27,12 @@ module.exports = {
                 const helpEmbed = new EmbedBuilder()
                     .setTitle('🔧 QUẢN LÝ CHUYÊN GIA')
                     .setDescription('**Các lệnh quản lý chuyên gia:**\n\n' +
-                        '**Thêm chuyên gia:**\n' +
+                        '**Thêm/Cập nhật chuyên gia:**\n' +
                         '`,expert add @user [specialty1] [specialty2]...`\n' +
                         '**Ví dụ:** `,expert add @john love career`\n\n' +
+                        '**Xóa lĩnh vực:**\n' +
+                        '`,expert delfield @user [specialty1] [specialty2]...`\n' +
+                        '**Ví dụ:** `,expert delfield @john love`\n\n' +
                         '**Xóa chuyên gia:**\n' +
                         '`,expert remove @user`\n\n' +
                         '**Danh sách chuyên gia:**\n' +
@@ -66,6 +69,9 @@ module.exports = {
                     break;
                 case 'remove':
                     await this.removeExpert(message, args);
+                    break;
+                case 'delfield':
+                    await this.removeSpecialty(message, args);
                     break;
                 case 'list':
                     await this.listExperts(message);
@@ -119,14 +125,27 @@ module.exports = {
 
         try {
             // Kiểm tra đã là chuyên gia chưa
-            const existingExpert = await Expert.findOne({ userId: user.id });
+            let expert = await Expert.findOne({ userId: user.id });
             
-            if (existingExpert) {
-                return await message.reply('❌ User này đã là chuyên gia rồi!');
+            if (expert) {
+                // Nếu đã là chuyên gia, thêm lĩnh vực mới
+                const newSpecialties = [...new Set([...expert.specialties, ...specialties])]; // Loại bỏ trùng lặp
+                expert.specialties = newSpecialties;
+                await expert.save();
+                
+                const successEmbed = new EmbedBuilder()
+                    .setTitle('✅ Đã cập nhật lĩnh vực')
+                    .setDescription(`**Chuyên gia:** ${user.displayName}\n` +
+                        `**Lĩnh vực hiện tại:** ${newSpecialties.map(s => SPECIALTIES[s]).join(', ')}\n` +
+                        `**Trạng thái:** ${expert.status === 'active' ? 'Đang hoạt động' : 'Không hoạt động'}`)
+                    .setColor('#00FF00')
+                    .setThumbnail(user.displayAvatarURL());
+
+                return await message.reply({ embeds: [successEmbed] });
             }
 
-            // Tạo chuyên gia mới
-            const expert = await Expert.create({
+            // Tạo chuyên gia mới nếu chưa tồn tại
+            expert = await Expert.create({
                 userId: user.id,
                 username: user.username,
                 specialties: specialties,
@@ -191,6 +210,53 @@ module.exports = {
         } catch (error) {
             console.error('Lỗi remove expert:', error);
             await message.reply('❌ Có lỗi xảy ra khi xóa chuyên gia!');
+        }
+    },
+
+    // Xóa lĩnh vực của chuyên gia
+    async removeSpecialty(message, args) {
+        if (!message.mentions.users.first()) {
+            return await message.reply('❌ Vui lòng tag chuyên gia cần xóa lĩnh vực!');
+        }
+
+        const user = message.mentions.users.first();
+        const specialtiesToRemove = args.slice(2).filter(s => SPECIALTIES[s]);
+
+        if (specialtiesToRemove.length === 0) {
+            return await message.reply('❌ Vui lòng chỉ định ít nhất 1 lĩnh vực cần xóa!');
+        }
+
+        try {
+            const expert = await Expert.findOne({ userId: user.id });
+            
+            if (!expert) {
+                return await message.reply('❌ User này không phải là chuyên gia!');
+            }
+
+            // Lọc ra các lĩnh vực còn lại
+            const remainingSpecialties = expert.specialties.filter(s => !specialtiesToRemove.includes(s));
+            
+            if (remainingSpecialties.length === 0) {
+                return await message.reply('❌ Không thể xóa tất cả lĩnh vực! Chuyên gia cần ít nhất 1 lĩnh vực.\n\nNếu muốn xóa hoàn toàn, hãy dùng lệnh `,expert remove @user`');
+            }
+
+            // Cập nhật lĩnh vực
+            expert.specialties = remainingSpecialties;
+            await expert.save();
+
+            const successEmbed = new EmbedBuilder()
+                .setTitle('✅ Đã xóa lĩnh vực')
+                .setDescription(`**Chuyên gia:** ${user.displayName}\n` +
+                    `**Đã xóa:** ${specialtiesToRemove.map(s => SPECIALTIES[s]).join(', ')}\n` +
+                    `**Lĩnh vực còn lại:** ${remainingSpecialties.map(s => SPECIALTIES[s]).join(', ')}`)
+                .setColor('#FFA500')
+                .setThumbnail(user.displayAvatarURL());
+
+            await message.reply({ embeds: [successEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi remove specialty:', error);
+            await message.reply('❌ Có lỗi xảy ra khi xóa lĩnh vực!');
         }
     },
 
