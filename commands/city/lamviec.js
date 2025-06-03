@@ -127,7 +127,7 @@ module.exports = {
                     `• **Giới hạn:** Mỗi nhà chỉ trộm được 1 lần/ngày\n` +
                     `• **Thu nhập:** 100-500 Rin ngẫu nhiên\n\n` +
                     `🌱 **TRỘM CÂY TRONG FARM:**\n` +
-                    `• **Điều kiện:** Cây đã trưởng thành và có thể thu hoạch\n` +
+                    `• **Điều kiện:** Cây đã trưởng thành và có thể thu hoạch (KHÔNG cần nhà)\n` +
                     `• **Thời gian:** Từ khi cây có thể thu hoạch đến 3 tiếng (chưa chết)\n` +
                     `• **Thu nhập:** 30-70% giá trị cây\n` +
                     `• **Rủi ro:** Có thể bị công an bắt trong 10 phút\n\n` +
@@ -174,8 +174,8 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setTitle('🎯 DANH SÁCH MỤC TIÊU TRỘM')
             .setDescription(`**Danh sách những người có thể trộm:**\n\n` +
-                `🌱 **Trộm cây:** Cây đã trưởng thành và có thể thu hoạch\n` +
-                `🏠 **Trộm tiền:** ${canStealMoney ? '✅ Hiện tại có thể (19h-21h)' : '❌ Ngoài giờ (19h-21h)'}\n\n` +
+                `🌱 **Trộm cây:** Cây đã trưởng thành và có thể thu hoạch (KHÔNG cần nhà)\n` +
+                `🏠 **Trộm tiền:** ${canStealMoney ? '✅ Hiện tại có thể (19h-21h, CẦN có nhà)' : '❌ Ngoài giờ (19h-21h, CẦN có nhà)'}\n\n` +
                 `⏰ **Cooldown:** 2 phút/lần trộm\n` +
                 `⚠️ **Nguy cơ:** Có thể bị công an bắt\n` +
                 `📅 **Trộm tiền:** Mỗi nhà chỉ 1 lần/ngày\n\n` +
@@ -217,23 +217,25 @@ module.exports = {
             });
 
             // Xác định có thể trộm gì
-            const canStealTrees = stealableTrees.length > 0 ; // CHỈ trộm cây khi có nhà
-            const canStealHouseMoney = canStealMoney  && !hasStealenMoneyToday;
+            const canStealTrees = stealableTrees.length > 0; // Trộm cây KHÔNG cần nhà
+            const canStealHouseMoney = canStealMoney && hasHouse && !hasStealenMoneyToday; // Trộm tiền CẦN có nhà
 
             if (!canStealTrees && !canStealHouseMoney) {
                 let reason = '';
-                if (!hasHouse) {
-                    reason = `${targetUser.displayName} không có nhà trọ! Cần có nhà để có thể bị trộm cây hoặc tiền.`;
-                } else if (stealableTrees.length === 0) {
+                if (stealableTrees.length === 0) {
                     if (!canStealMoney) {
                         reason = `${targetUser.displayName} không có cây nào để trộm và không trong giờ trộm tiền (19h-21h)!`;
+                    } else if (!hasHouse) {
+                        reason = `${targetUser.displayName} không có cây nào để trộm và không có nhà để trộm tiền!`;
                     } else if (hasStealenMoneyToday) {
                         reason = `${targetUser.displayName} không có cây nào để trộm và bạn đã trộm tiền nhà này hôm nay rồi!`;
                     }
                 } else {
-                    // Có cây nhưng không thể trộm vì các lý do khác
+                    // Có cây nhưng không thể trộm tiền vì các lý do khác
                     if (!canStealMoney) {
                         reason = `${targetUser.displayName} có cây nhưng không trong giờ trộm tiền (19h-21h)!`;
+                    } else if (!hasHouse) {
+                        reason = `${targetUser.displayName} có cây nhưng không có nhà để trộm tiền!`;
                     } else if (hasStealenMoneyToday) {
                         reason = `${targetUser.displayName} có cây nhưng bạn đã trộm tiền nhà này hôm nay rồi!`;
                     }

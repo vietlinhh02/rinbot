@@ -381,7 +381,9 @@ client.on('interactionCreate', async (interaction) => {
         // Xử lý interactions cho hỏi chuyên gia
         if (interaction.customId && (
             interaction.customId.startsWith('ask_expert_') ||
-            interaction.customId.startsWith('question_modal_')
+            interaction.customId.startsWith('question_modal_') ||
+            interaction.customId.startsWith('expert_reply_') ||
+            interaction.customId.startsWith('expert_answer_')
         )) {
             const hoiCommand = client.commands.get('hoi');
             if (hoiCommand && hoiCommand.handleInteraction) {

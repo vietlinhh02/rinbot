@@ -37,7 +37,15 @@ module.exports = {
                         '**Thống kê:**\n' +
                         '`,expert stats`\n\n' +
                         '**Bật/tắt chuyên gia:**\n' +
-                        '`,expert toggle @user`')
+                        '`,expert toggle @user`\n\n' +
+                        '**🆕 Đăng ký room public:**\n' +
+                        '`,expert setroom #channel` - Đặt room để public câu hỏi\n' +
+                        '`,expert removeroom` - Xóa room public\n' +
+                        '`,expert showroom` - Xem room hiện tại\n\n' +
+                        '**🎛️ Tùy chỉnh mã:**\n' +
+                        '`,expert setcode [format]` - Đặt format mã (VD: Q{4}, ASK{6})\n' +
+                        '`,expert resetcode` - Reset về mã mặc định\n' +
+                        '`,expert showcode` - Xem format hiện tại')
                     .addFields({
                         name: '📋 Lĩnh vực chuyên môn',
                         value: Object.entries(SPECIALTIES)
@@ -67,6 +75,24 @@ module.exports = {
                     break;
                 case 'toggle':
                     await this.toggleExpert(message, args);
+                    break;
+                case 'setroom':
+                    await this.setPublicRoom(message, args);
+                    break;
+                case 'removeroom':
+                    await this.removePublicRoom(message);
+                    break;
+                case 'showroom':
+                    await this.showPublicRoom(message);
+                    break;
+                case 'setcode':
+                    await this.setCodeFormat(message, args);
+                    break;
+                case 'resetcode':
+                    await this.resetCodeFormat(message);
+                    break;
+                case 'showcode':
+                    await this.showCodeFormat(message);
                     break;
                 default:
                     await message.reply('❌ Lệnh không hợp lệ! Gõ `,expert` để xem hướng dẫn.');
@@ -273,5 +299,252 @@ module.exports = {
             console.error('Lỗi toggle expert:', error);
             await message.reply('❌ Có lỗi xảy ra!');
         }
+    },
+
+    // Đặt room public cho câu hỏi
+    async setPublicRoom(message, args) {
+        try {
+            const channel = message.mentions.channels.first();
+            if (!channel) {
+                return await message.reply('❌ Vui lòng tag channel cần đặt làm room public!\n**Ví dụ:** `,expert setroom #hoi-chuyen-gia`');
+            }
+
+            // Kiểm tra quyền của bot trong channel
+            const botMember = message.guild.members.cache.get(message.client.user.id);
+            const permissions = channel.permissionsFor(botMember);
+            
+            if (!permissions.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
+                return await message.reply('❌ Bot không có quyền gửi tin nhắn trong channel này!');
+            }
+
+            // Lưu vào database hoặc config
+            const { getGuildConfig, updateGuildConfig } = require('../../utils/database');
+            await updateGuildConfig(message.guild.id, { 
+                expertPublicRoom: channel.id 
+            });
+
+            const successEmbed = new EmbedBuilder()
+                .setTitle('✅ Đã đặt room public')
+                .setDescription(`**Channel:** ${channel}\n\n` +
+                    '📋 **Cách hoạt động mới:**\n' +
+                    '• Khi có người hỏi chuyên gia, câu hỏi sẽ được đăng công khai trong room này\n' +
+                    '• Chuyên gia có thể reply trực tiếp bằng button, không cần mã phức tạp\n' +
+                    '• Reply sẽ ẩn danh (không hiện tên chuyên gia)\n' +
+                    '• Người hỏi và chuyên gia đều thấy câu hỏi & câu trả lời')
+                .setColor('#00FF00');
+
+            await message.reply({ embeds: [successEmbed] });
+
+            // Gửi thông báo vào room được đặt
+            const welcomeEmbed = new EmbedBuilder()
+                .setTitle('🎉 ROOM CHUYÊN GIA ĐƯỢC KÍCH HOẠT')
+                .setDescription('**Room này đã được đặt làm nơi public câu hỏi chuyên gia!**\n\n' +
+                    '📋 **Cách thức hoạt động:**\n' +
+                    '• Khi có người sử dụng lệnh hỏi chuyên gia, câu hỏi sẽ xuất hiện ở đây\n' +
+                    '• Chuyên gia có thể trả lời trực tiếp bằng button\n' +
+                    '• Tất cả reply đều ẩn danh\n' +
+                    '• Mọi người đều có thể thấy câu hỏi và câu trả lời\n\n' +
+                    '🔒 **Hoàn toàn ẩn danh và chuyên nghiệp**')
+                .setColor('#0099FF')
+                .setFooter({ text: 'Hệ thống tư vấn công khai' });
+
+            await channel.send({ embeds: [welcomeEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi set public room:', error);
+            await message.reply('❌ Có lỗi xảy ra khi đặt room public!');
+        }
+    },
+
+    // Xóa room public
+    async removePublicRoom(message) {
+        try {
+            const { getGuildConfig, updateGuildConfig } = require('../../utils/database');
+            const config = await getGuildConfig(message.guild.id);
+            
+            if (!config?.expertPublicRoom) {
+                return await message.reply('❌ Chưa có room public nào được đặt!');
+            }
+
+            await updateGuildConfig(message.guild.id, { 
+                expertPublicRoom: null 
+            });
+
+            const successEmbed = new EmbedBuilder()
+                .setTitle('✅ Đã xóa room public')
+                .setDescription('Hệ thống sẽ quay lại chế độ DM như cũ.')
+                .setColor('#FF0000');
+
+            await message.reply({ embeds: [successEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi remove public room:', error);
+            await message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
+
+    // Xem room public hiện tại
+    async showPublicRoom(message) {
+        try {
+            const { getGuildConfig } = require('../../utils/database');
+            const config = await getGuildConfig(message.guild.id);
+            
+            if (!config?.expertPublicRoom) {
+                return await message.reply('📋 Chưa có room public nào được đặt.\n\nSử dụng `,expert setroom #channel` để đặt room.');
+            }
+
+            const channel = message.guild.channels.cache.get(config.expertPublicRoom);
+            if (!channel) {
+                return await message.reply('⚠️ Room public đã bị xóa hoặc không tồn tại.');
+            }
+
+            const infoEmbed = new EmbedBuilder()
+                .setTitle('📋 Room Public Hiện Tại')
+                .setDescription(`**Channel:** ${channel}\n\n` +
+                    '✅ Đang hoạt động bình thường\n' +
+                    '📊 Câu hỏi mới sẽ được đăng công khai ở đây')
+                .setColor('#0099FF');
+
+            await message.reply({ embeds: [infoEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi show public room:', error);
+            await message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
+
+    // Đặt format mã custom
+    async setCodeFormat(message, args) {
+        try {
+            if (!args[1]) {
+                return await message.reply('❌ Vui lòng nhập format mã!\n\n' +
+                    '**Cách sử dụng:**\n' +
+                    '`,expert setcode Q{4}` - Mã dạng Q1234\n' +
+                    '`,expert setcode ASK{6}` - Mã dạng ASK123456\n' +
+                    '`,expert setcode HELP{3}` - Mã dạng HELP123\n\n' +
+                    '**Lưu ý:** {số} là độ dài phần số ngẫu nhiên');
+            }
+
+            const format = args[1];
+            
+            // Validate format
+            const formatRegex = /^[A-Z]*\{([1-9]\d*)\}$/;
+            const match = format.match(formatRegex);
+            
+            if (!match) {
+                return await message.reply('❌ Format không hợp lệ!\n\n' +
+                    '**Format đúng:** [PREFIX]{số}\n' +
+                    '**Ví dụ:** Q{4}, ASK{6}, HELP{3}\n' +
+                    '• PREFIX có thể rỗng hoặc chỉ chứa chữ IN HOA\n' +
+                    '• Số phải từ 1-20');
+            }
+
+            const length = parseInt(match[1]);
+            if (length > 20) {
+                return await message.reply('❌ Độ dài tối đa là 20 ký tự!');
+            }
+
+            // Lưu format
+            const { getGuildConfig, updateGuildConfig } = require('../../utils/database');
+            await updateGuildConfig(message.guild.id, { 
+                expertCodeFormat: format 
+            });
+
+            const prefix = format.replace(/\{\d+\}$/, '');
+            const successEmbed = new EmbedBuilder()
+                .setTitle('✅ Đã đặt format mã')
+                .setDescription(`**Format mới:** \`${format}\`\n\n` +
+                    `**Ví dụ mã:** \`${this.generateCode(format)}\`\n` +
+                    `**Prefix:** ${prefix || '(Không có)'}\n` +
+                    `**Độ dài số:** ${length} ký tự\n\n` +
+                    '✨ Format này sẽ áp dụng cho tất cả câu hỏi mới!')
+                .setColor('#00FF00');
+
+            await message.reply({ embeds: [successEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi set code format:', error);
+            await message.reply('❌ Có lỗi xảy ra khi đặt format mã!');
+        }
+    },
+
+    // Reset format mã về mặc định
+    async resetCodeFormat(message) {
+        try {
+            const { getGuildConfig, updateGuildConfig } = require('../../utils/database');
+            await updateGuildConfig(message.guild.id, { 
+                expertCodeFormat: null 
+            });
+
+            const successEmbed = new EmbedBuilder()
+                .setTitle('✅ Đã reset format mã')
+                .setDescription('**Format:** Mặc định (4 ký tự ngẫu nhiên)\n' +
+                    '**Ví dụ:** `A1B2`, `X9Y7`\n\n' +
+                    '🔄 Đã quay về format mặc định của hệ thống!')
+                .setColor('#FFA500');
+
+            await message.reply({ embeds: [successEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi reset code format:', error);
+            await message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
+
+    // Xem format mã hiện tại
+    async showCodeFormat(message) {
+        try {
+            const { getGuildConfig } = require('../../utils/database');
+            const config = await getGuildConfig(message.guild.id);
+            
+            const format = config?.expertCodeFormat;
+            
+            let description;
+            if (format) {
+                description = `**Format hiện tại:** \`${format}\`\n` +
+                    `**Ví dụ mã:** \`${this.generateCode(format)}\`\n\n` +
+                    '🎛️ **Custom format được thiết lập**\n' +
+                    'Dùng `,expert resetcode` để về mặc định';
+            } else {
+                description = '**Format:** Mặc định (4 ký tự ngẫu nhiên)\n' +
+                    '**Ví dụ:** `A1B2`, `X9Y7`\n\n' +
+                    '⚙️ **Sử dụng format mặc định**\n' +
+                    'Dùng `,expert setcode [format]` để tùy chỉnh';
+            }
+
+            const infoEmbed = new EmbedBuilder()
+                .setTitle('🎛️ Format Mã Câu Hỏi')
+                .setDescription(description)
+                .setColor('#0099FF');
+
+            await message.reply({ embeds: [infoEmbed] });
+
+        } catch (error) {
+            console.error('Lỗi show code format:', error);
+            await message.reply('❌ Có lỗi xảy ra!');
+        }
+    },
+
+    // Helper: Generate code theo format
+    generateCode(format) {
+        if (!format) {
+            // Mặc định
+            return Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
+
+        const match = format.match(/^([A-Z]*)\{(\d+)\}$/);
+        if (!match) return 'INVALID';
+
+        const prefix = match[1];
+        const length = parseInt(match[2]);
+        
+        // Tạo phần số ngẫu nhiên
+        let randomPart = '';
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        for (let i = 0; i < length; i++) {
+            randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        return prefix + randomPart;
     }
 }; 

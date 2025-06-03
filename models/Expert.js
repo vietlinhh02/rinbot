@@ -18,17 +18,22 @@ const expertSchema = new mongoose.Schema({
 const consultationSchema = new mongoose.Schema({
     consultationId: { type: String, required: true, unique: true },
     userId: { type: String, required: true }, // Người hỏi
+    guildId: { type: String, required: true }, // Server ID
     expertId: { type: String }, // Chuyên gia được chọn (có thể null nếu random)
     question: { type: String, required: true },
     category: { type: String }, // Thể loại câu hỏi
     status: { 
         type: String, 
-        enum: ['pending', 'assigned', 'answered', 'closed'], 
+        enum: ['pending', 'assigned', 'answered', 'closed', 'published'], 
         default: 'pending' 
     },
     answer: { type: String },
     dmMessageId: { type: String }, // ID tin nhắn DM gửi cho expert
     userNotified: { type: Boolean, default: false },
+    // Fields cho public room
+    shortId: { type: String }, // Mã ngắn 4 ký tự
+    publicChannelId: { type: String }, // Channel ID để public
+    publicMessageId: { type: String }, // Message ID của câu hỏi public
     expertResponse: {
         answeredAt: { type: Date },
         expertUserId: { type: String }
