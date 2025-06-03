@@ -43,7 +43,8 @@ module.exports = {
                     `👥 **Có ${expertCount} chuyên gia** đang sẵn sàng tư vấn\n\n` +
                     '**📋 Chọn thể loại câu hỏi:**')
                 .setColor('#0099FF')
-                .setThumbnail('https://raw.githubusercontent.com/vietlinhh02/test/refs/heads/main/d098bf056c1a3a3f23261606edde04de.png');
+                .setThumbnail('https://raw.githubusercontent.com/vietlinhh02/test/refs/heads/main/d098bf056c1a3a3f23261606edde04de.png')
+                .setFooter({ text: 'Tin nhắn này sẽ tự động ẩn sau 3 phút' });
 
             // Tạo buttons cho categories
             const row1 = new ActionRowBuilder();
@@ -63,7 +64,16 @@ module.exports = {
                 }
             });
 
-            await message.reply({ embeds: [helpEmbed], components: [row1, row2] });
+            const helpMessage = await message.reply({ embeds: [helpEmbed], components: [row1, row2] });
+
+            // Tự động xóa tin nhắn hướng dẫn sau 3 phút để tránh spam
+            setTimeout(async () => {
+                try {
+                    await helpMessage.delete();
+                } catch (deleteError) {
+                    console.log('Không thể xóa tin nhắn hướng dẫn (có thể đã bị xóa):', deleteError.message);
+                }
+            }, 180000); // 3 phút
 
         } catch (error) {
             console.error('Lỗi hoi:', error);
@@ -121,7 +131,7 @@ module.exports = {
                     status: 'pending'
                 });
 
-                // Gửi thông báo xác nhận cho user
+                // Gửi thông báo xác nhận cho user (ephemeral)
                 const confirmEmbed = new EmbedBuilder()
                     .setTitle('✅ Đã gửi câu hỏi')
                     .setDescription(`**Mã số:** \`${consultationId}\`\n` +
@@ -132,10 +142,43 @@ module.exports = {
                     .setColor('#00FF00')
                     .setFooter({ text: 'Hệ thống tư vấn ẩn danh' });
 
-                await interaction.reply({ embeds: [confirmEmbed], flags: 64 });
+                await interaction.reply({ embeds: [confirmEmbed], ephemeral: true });
 
                 // Tìm và gửi cho chuyên gia
                 await this.assignToExpert(interaction.client, consultation, category);
+
+                // Ẩn tin nhắn gốc sau khi gửi thành công
+                try {
+                    // Lấy tin nhắn gốc (tin nhắn có button hỏi chuyên gia)
+                    const originalMessage = await interaction.channel.messages.fetch(interaction.message.id);
+                    
+                    // Tạo embed thông báo đã gửi
+                    const sentEmbed = new EmbedBuilder()
+                        .setTitle('✅ Câu hỏi đã được gửi')
+                        .setDescription(`${interaction.user} đã gửi câu hỏi **${CATEGORIES[category]}** thành công!\n\n` +
+                            '🔒 **Ẩn danh hoàn toàn** - Chuyên gia sẽ trả lời sớm nhất có thể.')
+                        .setColor('#00FF00')
+                        .setFooter({ text: 'Tin nhắn này sẽ tự động ẩn sau 10 giây' });
+
+                    // Edit tin nhắn gốc thành thông báo đã gửi
+                    await originalMessage.edit({ 
+                        embeds: [sentEmbed], 
+                        components: [] // Xóa tất cả button
+                    });
+
+                    // Tự động xóa tin nhắn sau 10 giây
+                    setTimeout(async () => {
+                        try {
+                            await originalMessage.delete();
+                        } catch (deleteError) {
+                            console.log('Không thể xóa tin nhắn (có thể đã bị xóa):', deleteError.message);
+                        }
+                    }, 10000);
+
+                } catch (editError) {
+                    console.log('Không thể edit/xóa tin nhắn gốc:', editError.message);
+                    // Không cần thông báo lỗi cho user vì câu hỏi đã được gửi thành công
+                }
 
             } catch (error) {
                 console.error('Lỗi submit question:', error);
@@ -145,7 +188,7 @@ module.exports = {
                     .setDescription('Không thể gửi câu hỏi. Vui lòng thử lại sau!')
                     .setColor('#FF0000');
 
-                await interaction.reply({ embeds: [errorEmbed], flags: 64 });
+                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
             }
         }
     },
