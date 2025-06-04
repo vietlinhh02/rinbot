@@ -2,6 +2,9 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { getCityUser, updateCityUser, getUserRin, updateUserRin } = require('../../utils/database');
 const { HOUSE_IMAGES } = require('../../utils/constants');
 
+// Simple lock mechanism để tránh race condition
+const userLocks = new Set();
+
 // Thông tin các loại nhà để hiển thị thông tin nhà hiện tại
 const HOUSE_TYPES = {
     'nhatro': {
@@ -119,11 +122,19 @@ module.exports = {
             }
 
             if (result === 'confirm') {
-                const cityUser = await getCityUser(userId);
-
-                if (!cityUser.home) {
-                    return await interaction.reply({ content: '❌ Bạn không có nhà để hủy!', ephemeral: true });
+                // Kiểm tra lock để tránh double-processing
+                if (userLocks.has(userId)) {
+                    return await interaction.reply({ content: '❌ Đang xử lý, vui lòng đợi!', ephemeral: true });
                 }
+                
+                userLocks.add(userId);
+                
+                try {
+                    const cityUser = await getCityUser(userId);
+
+                    if (!cityUser.home) {
+                        return await interaction.reply({ content: '❌ Bạn không có nhà để hủy!', ephemeral: true });
+                    }
 
                 const houseInfo = HOUSE_TYPES[cityUser.home];
                 if (!houseInfo) {
@@ -131,10 +142,13 @@ module.exports = {
                 }
 
                 const refundAmount = Math.floor(houseInfo.price * 0.5);
+                const oldHouseThumbnail = HOUSE_IMAGES[cityUser.home] || null;
+
+                console.log(`🏠 DEBUG: User ${userId} hủy nhà ${cityUser.home}`);
 
                 // Hoàn tiền và xóa nhà, nghề
                 await updateUserRin(userId, refundAmount);
-                await updateCityUser(userId, {
+                const updateResult = await updateCityUser(userId, {
                     home: null,
                     job: null,
                     workProgress: 0,
@@ -143,6 +157,12 @@ module.exports = {
                     lastRepair: null,
                     dailyMoneySteal: {}
                 });
+
+                console.log(`🏠 DEBUG: Kết quả update:`, updateResult);
+
+                // Kiểm tra lại để đảm bảo đã xóa thành công
+                const verifyUser = await getCityUser(userId);
+                console.log(`🏠 DEBUG: Verify user sau khi xóa:`, { home: verifyUser.home, job: verifyUser.job });
 
                 const embed = new EmbedBuilder()
                     .setTitle('✅ HỦY THUÊ NHÀ THÀNH CÔNG!')
@@ -155,12 +175,16 @@ module.exports = {
                         `• Dùng \`,thuenha\` để thuê nhà mới\n` +
                         `• Sau đó dùng \`,dangkynghe\` để chọn nghề`)
                     .setColor('#00FF00')
-                    .setThumbnail(HOUSE_IMAGES[cityUser.home] || null)
+                    .setThumbnail(oldHouseThumbnail)
                     .setFooter({ text: 'Cảm ơn bạn đã sử dụng dịch vụ thuê nhà!' })
                     .setTimestamp();
 
                 // Update message để xóa buttons
                 await interaction.update({ embeds: [embed], components: [] });
+
+                } finally {
+                    userLocks.delete(userId);
+                }
 
             } else {
                 // Hủy bỏ hủy nhà

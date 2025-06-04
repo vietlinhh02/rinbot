@@ -2,6 +2,9 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { getCityUser, updateCityUser } = require('../../utils/database');
 const FastUtils = require('../../utils/fastUtils');
 
+// Simple lock mechanism để tránh race condition
+const userLocks = new Set();
+
 // Thông tin các loại nhà
 const HOUSE_TYPES = {
     'nhatro': {
@@ -60,6 +63,8 @@ module.exports = {
             }
 
             // Kiểm tra nếu đã có nhà
+            console.log(`🏠 DEBUG: User ${userId} cố gắng thuê ${houseType}, hiện tại có nhà: ${cityUser.home}`);
+            
             if (cityUser.home) {
                 if (cityUser.home === houseType) {
                     return message.reply(`🏠 Bạn đã thuê ${houseInfo.name} rồi!`);
@@ -155,8 +160,17 @@ module.exports = {
             const houseType = parts[3];
             const houseInfo = HOUSE_TYPES[houseType];
 
+            // Kiểm tra lock để tránh double-processing
+            if (userLocks.has(userId)) {
+                return interaction.reply({ content: '❌ Đang xử lý, vui lòng đợi!', ephemeral: true });
+            }
+            
+            userLocks.add(userId);
+
             try {
                 const cityUser = await getCityUser(userId);
+
+                console.log(`🏠 DEBUG: User ${userId} xác nhận thuê ${houseType}, hiện tại có nhà: ${cityUser.home}`);
 
                 if (cityUser.home) {
                     return interaction.reply({ content: '❌ Bạn đã có nhà rồi!', ephemeral: true });
@@ -194,6 +208,8 @@ module.exports = {
             } catch (error) {
                 console.error('Lỗi xác nhận thuê nhà:', error);
                 await interaction.reply({ content: '❌ Có lỗi xảy ra khi thuê nhà!', ephemeral: true });
+            } finally {
+                userLocks.delete(userId);
             }
 
         } else {
