@@ -5,6 +5,17 @@ const FastUtils = require('../../utils/fastUtils');
 // Simple lock mechanism để tránh race condition
 const userLocks = new Set();
 
+// Auto-cleanup locks sau 30 giây để tránh stuck
+const lockCleanup = () => {
+    if (userLocks.size > 0) {
+        console.log(`🧹 [THUENHA] Cleaning up ${userLocks.size} stuck locks:`, Array.from(userLocks));
+        userLocks.clear();
+    }
+};
+
+// Cleanup mỗi 30 giây
+setInterval(lockCleanup, 30000);
+
 // Thông tin các loại nhà
 const HOUSE_TYPES = {
     'nhatro': {
@@ -162,10 +173,12 @@ module.exports = {
 
             // Kiểm tra lock để tránh double-processing
             if (userLocks.has(userId)) {
+                console.log(`🔒 User ${userId} đang bị lock, bỏ qua request thuê nhà`);
                 return interaction.reply({ content: '❌ Đang xử lý, vui lòng đợi!', ephemeral: true });
             }
             
             userLocks.add(userId);
+            console.log(`🔒 Lock user ${userId} bắt đầu xử lý thuê nhà`);
 
             try {
                 const cityUser = await getCityUser(userId);
@@ -212,6 +225,7 @@ module.exports = {
                 await interaction.reply({ content: '❌ Có lỗi xảy ra khi thuê nhà!', ephemeral: true });
             } finally {
                 userLocks.delete(userId);
+                console.log(`🔓 Unlock user ${userId} hoàn thành xử lý thuê nhà`);
             }
 
         } else {

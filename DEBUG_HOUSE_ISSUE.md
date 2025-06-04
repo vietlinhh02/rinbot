@@ -31,12 +31,19 @@ Sau khi hủy thuê trọ bằng lệnh `,huynha`, khi thuê lại thì hệ th�
 - ✅ Sửa cron job reset để không dùng `$unset` với empty string
 - ✅ Thêm kiểm tra interaction state trước khi update
 
+### 6. Sửa User Locks Stuck
+- ✅ Thêm detailed logging cho lock/unlock operations
+- ✅ Auto-cleanup locks mỗi 30 giây
+- ✅ Command `,clearlocks` cho admin
+- ✅ Console logs để track lock activity
+
 ## 🔧 Cách sử dụng debug tools
 
 ### Cho Admin:
 ```
 ,debuguser @username        # Xem thông tin debug của user
 ,debuguser @username fix    # Reset hoàn toàn thông tin nhà/nghề của user
+,clearlocks                 # Clear tất cả user locks bị stuck
 ```
 
 ### Logs sẽ hiển thị:
@@ -59,6 +66,7 @@ Sau khi hủy thuê trọ bằng lệnh `,huynha`, khi thuê lại thì hệ th�
 7. **Cron Job $unset**: Reset daily với empty string thay vì proper values → **ĐÃ SỬA**
 8. **InteractionAlreadyReplied**: Lỗi database khiến interaction fail → **ĐÃ SỬA**
 9. **Multiple Interaction Replies**: Kiểm tra trạng thái interaction trước update → **ĐÃ SỬA**
+10. **User Locks Stuck**: User locks không được clear, gây báo "Đang xử lý" → **ĐÃ SỬA**
 
 ## 📋 Bước tiếp theo khi gặp lỗi
 

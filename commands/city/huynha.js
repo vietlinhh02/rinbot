@@ -5,6 +5,17 @@ const { HOUSE_IMAGES } = require('../../utils/constants');
 // Simple lock mechanism để tránh race condition
 const userLocks = new Set();
 
+// Auto-cleanup locks sau 30 giây để tránh stuck
+const lockCleanup = () => {
+    if (userLocks.size > 0) {
+        console.log(`🧹 Cleaning up ${userLocks.size} stuck locks:`, Array.from(userLocks));
+        userLocks.clear();
+    }
+};
+
+// Cleanup mỗi 30 giây
+setInterval(lockCleanup, 30000);
+
 // Thông tin các loại nhà để hiển thị thông tin nhà hiện tại
 const HOUSE_TYPES = {
     'nhatro': {
@@ -124,10 +135,12 @@ module.exports = {
             if (result === 'confirm') {
                 // Kiểm tra lock để tránh double-processing
                 if (userLocks.has(userId)) {
+                    console.log(`🔒 User ${userId} đang bị lock, bỏ qua request`);
                     return await interaction.reply({ content: '❌ Đang xử lý, vui lòng đợi!', ephemeral: true });
                 }
                 
                 userLocks.add(userId);
+                console.log(`🔒 Lock user ${userId} bắt đầu xử lý hủy nhà`);
                 
                 try {
                     const cityUser = await getCityUser(userId);
@@ -204,6 +217,7 @@ module.exports = {
 
                 } finally {
                     userLocks.delete(userId);
+                    console.log(`🔓 Unlock user ${userId} hoàn thành xử lý hủy nhà`);
                 }
 
             } else {
