@@ -203,7 +203,9 @@ module.exports = {
                     .setTimestamp();
 
                 // Update message để xóa buttons
-                await interaction.update({ embeds: [embed], components: [] });
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.update({ embeds: [embed], components: [] });
+                }
 
             } catch (error) {
                 console.error('Lỗi xác nhận thuê nhà:', error);
@@ -220,7 +222,9 @@ module.exports = {
                 .setColor('#6C757D');
 
             // Update message để xóa buttons
-            await interaction.update({ embeds: [embed], components: [] });
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.update({ embeds: [embed], components: [] });
+            }
         }
     }
 }; 

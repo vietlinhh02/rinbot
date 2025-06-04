@@ -198,7 +198,9 @@ module.exports = {
                     .setTimestamp();
 
                 // Update message để xóa buttons
-                await interaction.update({ embeds: [embed], components: [] });
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.update({ embeds: [embed], components: [] });
+                }
 
                 } finally {
                     userLocks.delete(userId);
@@ -212,7 +214,9 @@ module.exports = {
                     .setColor('#6C757D');
 
                 // Update message để xóa buttons
-                await interaction.update({ embeds: [embed], components: [] });
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.update({ embeds: [embed], components: [] });
+                }
             }
         } catch (error) {
             console.error('Lỗi xử lý interaction huynha:', error);
