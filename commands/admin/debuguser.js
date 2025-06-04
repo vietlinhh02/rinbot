@@ -46,6 +46,8 @@ module.exports = {
                     `**🎯 Thông tin khác:**\n` +
                     `• Job Streak: ${cityUser.jobStreak || 0}\n` +
                     `• Daily Voice Minutes: ${cityUser.dailyVoiceMinutes || 0}\n` +
+                    `• Daily Money Steal: ${cityUser.dailyMoneySteal || 0}\n` +
+                    `• Daily Steal Records: ${JSON.stringify(cityUser.dailyStealRecords || {})}\n` +
                     `• Jailed Until: ${cityUser.jailedUntil ? new Date(cityUser.jailedUntil).toLocaleString('vi-VN') : 'null'}\n` +
                     `• Created At: ${new Date(cityUser.createdAt).toLocaleString('vi-VN')}\n` +
                     `• Updated At: ${new Date(cityUser.updatedAt).toLocaleString('vi-VN')}`)
@@ -67,7 +69,8 @@ module.exports = {
                     lastWork: null,
                     workStartTime: null,
                     lastRepair: null,
-                    dailyMoneySteal: {},
+                    dailyMoneySteal: 0,
+                    dailyStealRecords: {},
                     jailedUntil: null,
                     jailedBy: null,
                     dailyVoiceMinutes: 0

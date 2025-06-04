@@ -147,22 +147,40 @@ module.exports = {
                 console.log(`🏠 DEBUG: User ${userId} hủy nhà ${cityUser.home}`);
 
                 // Hoàn tiền và xóa nhà, nghề
-                await updateUserRin(userId, refundAmount);
-                const updateResult = await updateCityUser(userId, {
-                    home: null,
-                    job: null,
-                    workProgress: 0,
-                    lastWork: null,
-                    workStartTime: null,
-                    lastRepair: null,
-                    dailyMoneySteal: {}
-                });
+                try {
+                    await updateUserRin(userId, refundAmount);
+                    
+                    const updateResult = await updateCityUser(userId, {
+                        home: null,
+                        job: null,
+                        workProgress: 0,
+                        lastWork: null,
+                        workStartTime: null,
+                        lastRepair: null,
+                        dailyMoneySteal: 0
+                    });
 
-                console.log(`🏠 DEBUG: Kết quả update:`, updateResult);
+                    console.log(`🏠 DEBUG: Kết quả update:`, updateResult ? 'thành công' : 'thất bại');
+                } catch (updateError) {
+                    console.error(`❌ LỖI UPDATE DATABASE:`, updateError);
+                    return await interaction.reply({ 
+                        content: '❌ Có lỗi xảy ra khi cập nhật database! Vui lòng thử lại sau.', 
+                        ephemeral: true 
+                    });
+                }
 
                 // Kiểm tra lại để đảm bảo đã xóa thành công
                 const verifyUser = await getCityUser(userId);
                 console.log(`🏠 DEBUG: Verify user sau khi xóa:`, { home: verifyUser.home, job: verifyUser.job });
+
+                // Kiểm tra xem update có thành công không
+                if (verifyUser.home !== null || verifyUser.job !== null) {
+                    console.error(`❌ LỖI: Update database thất bại! User vẫn có home=${verifyUser.home}, job=${verifyUser.job}`);
+                    return await interaction.reply({ 
+                        content: '❌ Có lỗi xảy ra khi hủy nhà! Vui lòng liên hệ admin để được hỗ trợ.', 
+                        ephemeral: true 
+                    });
+                }
 
                 const embed = new EmbedBuilder()
                     .setTitle('✅ HỦY THUÊ NHÀ THÀNH CÔNG!')
@@ -199,8 +217,10 @@ module.exports = {
         } catch (error) {
             console.error('Lỗi xử lý interaction huynha:', error);
             try {
-                if (!interaction.replied) {
+                if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
+                } else if (interaction.deferred) {
+                    await interaction.editReply({ content: '❌ Có lỗi xảy ra!' });
                 }
             } catch (replyError) {
                 console.error('Lỗi khi reply interaction:', replyError);

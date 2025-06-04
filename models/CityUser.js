@@ -18,7 +18,8 @@ const cityUserSchema = new mongoose.Schema({
     houseId: String, // ID loại nhà
     houseHealth: { type: Number, default: 100 }, // Độ bền nhà (%)
     houseRentedUntil: Date, // Thời gian thuê nhà hết hạn
-    dailyMoneySteal: { type: Number, default: 0 } // Số tiền đã trộm trong ngày
+    dailyMoneySteal: { type: Number, default: 0 }, // Số tiền đã trộm trong ngày
+    dailyStealRecords: { type: mongoose.Schema.Types.Mixed, default: {} } // Record trộm hàng ngày {userId: date}
 }, {
     timestamps: true
 });

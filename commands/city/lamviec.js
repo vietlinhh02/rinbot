@@ -195,7 +195,7 @@ module.exports = {
 
             // Kiểm tra đã trộm tiền nhà này hôm nay chưa
             const today = new Date().toDateString();
-            const dailyStealRecord = thiefCityUser.dailyMoneySteal || {};
+            const dailyStealRecord = thiefCityUser.dailyStealRecords || {};
             const hasStealenMoneyToday = dailyStealRecord[targetId] === today;
 
             // Kiểm tra target có nhà không (để trộm tiền)
@@ -256,7 +256,7 @@ module.exports = {
 
                 // Cập nhật record trộm tiền hôm nay
                 const newDailyRecord = { ...dailyStealRecord, [targetId]: today };
-                await updateCityUser(thiefId, { dailyMoneySteal: newDailyRecord });
+                await updateCityUser(thiefId, { dailyStealRecords: newDailyRecord });
 
             } else if (canStealTrees) {
                 // Trộm cây

@@ -903,13 +903,12 @@ const setupCronJobs = () => {
                     { job: 'nhabao' }
                 ]
             }, {
-                $unset: {
-                    lastWork: "",
-                    workStartTime: "",
-                    dailyVoiceMinutes: "",
-                    workProgress: "",
-                    dailyMoneySteal: ""
-                }
+                lastWork: null,
+                workStartTime: null,
+                dailyVoiceMinutes: 0,
+                workProgress: 0,
+                dailyMoneySteal: 0,
+                dailyStealRecords: {}
             });
             
             console.log('🌅 Đã reset công việc MC và Nhà báo cho ngày mới!');

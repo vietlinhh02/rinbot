@@ -22,6 +22,14 @@ Sau khi hủy thuê trọ bằng lệnh `,huynha`, khi thuê lại thì hệ th�
 - ✅ Command `,debuguser @user` để admin kiểm tra thông tin user
 - ✅ Command `,debuguser @user fix` để admin reset hoàn toàn user
 
+### 5. Sửa lỗi Schema Mismatch
+- ✅ Sửa `dailyMoneySteal: {}` thành `dailyMoneySteal: 0` để khớp với schema Number
+- ✅ Thêm field `dailyStealRecords` riêng cho steal tracking (Mixed type)
+- ✅ Cập nhật `lamviec.js` để sử dụng field mới
+- ✅ Thêm database validation và error handling
+- ✅ Sửa InteractionAlreadyReplied error
+- ✅ Sửa cron job reset để không dùng `$unset` với empty string
+
 ## 🔧 Cách sử dụng debug tools
 
 ### Cho Admin:
@@ -45,6 +53,10 @@ Sau khi hủy thuê trọ bằng lệnh `,huynha`, khi thuê lại thì hệ th�
 2. **Cache Issue**: FastUtils cache không sync → Thêm cache clear trong debug tool
 3. **Database Consistency**: Có thể có multiple records → Cần kiểm tra
 4. **Interaction Handling**: Button interactions không được process đúng → Đã kiểm tra logic
+5. **Schema Mismatch**: `dailyMoneySteal` được set object `{}` thay vì number `0` → **ĐÃ SỬA**
+6. **Mixed Type Conflict**: `lamviec.js` sử dụng `dailyMoneySteal` như object tracking → **ĐÃ SỬA**
+7. **Cron Job $unset**: Reset daily với empty string thay vì proper values → **ĐÃ SỬA**
+8. **InteractionAlreadyReplied**: Lỗi database khiến interaction fail → **ĐÃ SỬA**
 
 ## 📋 Bước tiếp theo khi gặp lỗi
 
