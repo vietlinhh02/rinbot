@@ -46,15 +46,11 @@ function createBetViews() {
     return [row1, row2];
 }
 
-// View với nút xác nhận và bắt đầu
+// View với nút bắt đầu (bỏ nút xác nhận)
 class ControlView extends ActionRowBuilder {
     constructor() {
         super();
         this.addComponents(
-            new ButtonBuilder()
-                .setCustomId('confirm_bet')
-                .setLabel('✅ Xác nhận cược')
-                .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
                 .setCustomId('start_game')
                 .setLabel('🎲 Bắt đầu quay (Chỉ quản trò)')
@@ -192,7 +188,7 @@ module.exports = {
                 return interaction.reply({ content: '❌ Không đủ Rin!', ephemeral: true });
             }
 
-            // Lưu cược
+            // Lưu cược (chưa trừ tiền)
             if (!game.bets.has(interaction.user.id)) {
                 game.bets.set(interaction.user.id, {});
             }
@@ -202,7 +198,7 @@ module.exports = {
             game.participants.add(interaction.user.id);
 
             await interaction.reply({ 
-                content: `✅ Đã cược **${amount} Rin** vào **${animal}**!`, 
+                content: `✅ Đã đặt cược **${amount} Rin** vào **${animal}**! Tiền sẽ được trừ khi bắt đầu quay.`, 
                 ephemeral: true 
             });
 
@@ -228,49 +224,6 @@ module.exports = {
             return;
         }
 
-        if (interaction.customId === 'confirm_bet') {
-            // Kiểm tra quản trò không được cược
-            if (interaction.user.id === game.host.id) {
-                return interaction.reply({ content: '❌ Quản trò không được đặt cược!', ephemeral: true });
-            }
-
-            if (game.started) {
-                return interaction.reply({ content: '❌ Game đã bắt đầu, không thể xác nhận cược!', ephemeral: true });
-            }
-
-            const userBets = game.bets.get(interaction.user.id);
-            if (!userBets || Object.keys(userBets).length === 0) {
-                return interaction.reply({ content: '❌ Bạn chưa đặt cược!', ephemeral: true });
-            }
-
-            // Tính tổng tiền cược
-            const totalBet = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
-            const userRin = await getUserRin(interaction.user.id);
-            
-            if (userRin < totalBet) {
-                return interaction.reply({ content: '❌ Bạn không đủ Rin để xác nhận!', ephemeral: true });
-            }
-
-            // Trừ tiền
-                            await FastUtils.updateFastUserRin(interaction.user.id, -totalBet);
-
-            // Tạo embed hiển thị cược
-            const betDisplay = Object.entries(userBets)
-                .map(([animal, amount]) => `• **${animal}**: ${amount} Rin`)
-                .join('\n');
-
-            const confirmEmbed = new EmbedBuilder()
-                .setTitle(`✅ ${interaction.user.displayName} đã xác nhận cược`)
-                .setDescription(betDisplay)
-                .setColor('#00FF00');
-
-            await interaction.reply({ embeds: [confirmEmbed] });
-
-            // Cập nhật embed chính để hiển thị danh sách người cược
-            await module.exports.updateGameEmbed(interaction, game);
-            return;
-        }
-
         if (interaction.customId === 'start_game') {
             if (interaction.user.id !== game.host.id) {
                 return interaction.reply({ content: '⛔ Chỉ quản trò được bắt đầu!', ephemeral: true });
@@ -284,18 +237,26 @@ module.exports = {
                 return interaction.reply({ content: '❌ Chưa có ai cược! Cần ít nhất 1 người đặt cược để bắt đầu.', ephemeral: true });
             }
 
-            // Kiểm tra tất cả người cược đã xác nhận chưa
-            let confirmedBets = 0;
+            // Kiểm tra có người cược chưa (không cần xác nhận nữa)
+            let totalBets = 0;
             for (const [userId, userBets] of game.bets) {
                 const totalBet = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
-                if (totalBet > 0) confirmedBets++;
+                if (totalBet > 0) totalBets++;
             }
 
-            if (confirmedBets === 0) {
-                return interaction.reply({ content: '❌ Chưa có ai xác nhận cược! Hãy bấm "✅ Xác nhận cược" trước.', ephemeral: true });
+            if (totalBets === 0) {
+                return interaction.reply({ content: '❌ Chưa có ai cược!', ephemeral: true });
             }
 
             game.started = true;
+
+            // Trừ tiền của tất cả người cược trước khi bắt đầu
+            for (const [userId, userBets] of game.bets) {
+                const totalBet = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
+                if (totalBet > 0) {
+                    await FastUtils.updateFastUserRin(userId, -totalBet);
+                }
+            }
 
             // Hiệu ứng quay từng xúc xắc (fix triệt để lỗi InteractionAlreadyReplied)
             let tempResults = [];
@@ -348,26 +309,26 @@ module.exports = {
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: +${winAmount} Rin (${amount} gốc + ${amount * multiplier} thưởng)`);
                     } else if (count === 2) {
                         multiplier = 2;
-                        winAmount = amount + (amount * multiplier); // Hoàn lại tiền cược + tiền thưởng  
+                        winAmount = amount + (amount * multiplier);
                         totalWin += winAmount;
-                        hostNetWinnings -= winAmount; // Nhà cái mất tiền khi người chơi thắng
+                        hostNetWinnings -= winAmount;
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: +${winAmount} Rin (${amount} gốc + ${amount * multiplier} thưởng)`);
                     } else if (count === 3) {
                         multiplier = 4;
-                        winAmount = amount + (amount * multiplier); // Hoàn lại tiền cược + tiền thưởng
+                        winAmount = amount + (amount * multiplier);
                         totalWin += winAmount;
-                        hostNetWinnings -= winAmount; // Nhà cái mất tiền khi người chơi thắng
+                        hostNetWinnings -= winAmount;
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: +${winAmount} Rin (${amount} gốc + ${amount * multiplier} thưởng)`);
                     } else {
                         totalLoss += amount;
-                        hostNetWinnings += amount; // Nhà cái nhận tiền khi người chơi thua
+                        hostNetWinnings += amount;
                         betResults.push(`${BAU_CUA_EMOJIS[animal]} ${animal}: -${amount} Rin`);
                     }
                 }
 
-                // Cộng tiền thắng cho người chơi (hoàn lại tiền cược + tiền thưởng)
+                // Cộng tiền thắng cho người chơi
                 if (totalWin > 0) {
-                    await FastUtils.updateFastUserRin(userId, totalWin); // Cộng tổng tiền nhận được
+                    await FastUtils.updateFastUserRin(userId, totalWin);
                 }
 
                 const netResult = totalWin - totalLoss;
@@ -381,7 +342,6 @@ module.exports = {
             }
 
             resultEmbed.setDescription(resultEmbed.data.description + '\n\n' + resultText);
-
             await interaction.editReply({ embeds: [resultEmbed] });
 
             // Xóa game
@@ -394,22 +354,29 @@ module.exports = {
                 return interaction.reply({ content: '⛔ Chỉ quản trò hoặc admin được hủy!', ephemeral: true });
             }
 
-            // Hoàn tiền cho tất cả người chơi
-            for (const [userId, userBets] of game.bets) {
-                const totalRefund = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
-                if (totalRefund > 0) {
-                    await FastUtils.updateFastUserRin(userId, totalRefund);
+            let cancelMessage = '❌ Ván Bầu Cua đã bị hủy!';
+
+            // Chỉ hoàn tiền nếu game đã bắt đầu (đã trừ tiền)
+            if (game.started) {
+                for (const [userId, userBets] of game.bets) {
+                    const totalRefund = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
+                    if (totalRefund > 0) {
+                        await FastUtils.updateFastUserRin(userId, totalRefund);
+                    }
                 }
+                cancelMessage = '❌ Ván Bầu Cua đã bị hủy! Đã hoàn tiền cho tất cả người chơi.';
+            } else {
+                cancelMessage = '❌ Ván Bầu Cua đã bị hủy! (Chưa trừ tiền nên không cần hoàn)';
             }
 
             games.delete(channelId);
 
             const cancelEmbed = new EmbedBuilder()
-                .setTitle('❌ Ván Bầu Cua đã bị hủy')
-                .setDescription('Đã hoàn tiền cho tất cả người chơi!')
+                .setTitle('❌ VÁN ĐÃ BỊ HỦY')
+                .setDescription(cancelMessage)
                 .setColor('#FF0000');
 
             await interaction.reply({ embeds: [cancelEmbed] });
         }
     }
-}; 
+};
