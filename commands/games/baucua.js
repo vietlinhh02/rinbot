@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const FastUtils = require('../../utils/fastUtils');
+const { getUserRin } = require('../../utils/database');
 const { BAU_CUA_ANIMALS, BAU_CUA_EMOJIS } = require('../../utils/constants');
 
 // Lưu trữ các ván game đang diễn ra
@@ -73,7 +74,7 @@ module.exports = {
     // Cập nhật embed game để hiển thị người cược
     async updateGameEmbed(interaction, game) {
         try {
-            // Tạo danh sách người đã xác nhận cược
+            // Tạo danh sách người đã cược
             let playerList = '';
             let totalPlayers = 0;
             let totalAmount = 0;
@@ -85,6 +86,7 @@ module.exports = {
                     const betDetails = Object.entries(userBets)
                         .map(([animal, amount]) => `${BAU_CUA_EMOJIS[animal]}${amount}`)
                         .join(' ');
+                    
                     playerList += `• **${user.displayName}**: ${betDetails} (${betTotal} Rin)\n`;
                     totalPlayers++;
                     totalAmount += betTotal;
@@ -93,7 +95,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setTitle('🎰 BẦU CUA ĐANG MỞ')
-                .setDescription(`**Quản trò:** ${game.host.displayName}\n\n${totalPlayers > 0 ? `**Người đã cược (${totalPlayers}):**\n${playerList}\n**Tổng số tiền:** ${totalAmount.toLocaleString()} Rin\n\n` : ''}Bấm vào các nút để đặt cược!`)
+                .setDescription(`**Quản trò:** ${game.host.displayName}\n\n${totalPlayers > 0 ? `**Người đã đặt cược (${totalPlayers}):**\n${playerList}\n**Tổng số tiền:** ${totalAmount.toLocaleString()} Rin\n\n` : ''}Bấm vào các nút để đặt cược!`)
                 .addFields(
                     { name: '📋 Luật chơi:', value: 
                         '• Chọn con vật để cược\n' +
@@ -203,6 +205,9 @@ module.exports = {
                 content: `✅ Đã cược **${amount} Rin** vào **${animal}**!`, 
                 ephemeral: true 
             });
+
+            // Cập nhật embed chính để hiển thị danh sách người cược
+            await module.exports.updateGameEmbed(interaction, game);
             return;
         }
 

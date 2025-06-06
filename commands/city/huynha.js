@@ -2,20 +2,6 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { getCityUser, updateCityUser, getUserRin, updateUserRin } = require('../../utils/database');
 const { HOUSE_IMAGES } = require('../../utils/constants');
 
-// Simple lock mechanism để tránh race condition
-const userLocks = new Set();
-
-// Auto-cleanup locks sau 30 giây để tránh stuck
-const lockCleanup = () => {
-    if (userLocks.size > 0) {
-        console.log(`🧹 Cleaning up ${userLocks.size} stuck locks:`, Array.from(userLocks));
-        userLocks.clear();
-    }
-};
-
-// Cleanup mỗi 30 giây
-setInterval(lockCleanup, 30000);
-
 // Thông tin các loại nhà để hiển thị thông tin nhà hiện tại
 const HOUSE_TYPES = {
     'nhatro': {
@@ -133,15 +119,6 @@ module.exports = {
             }
 
             if (result === 'confirm') {
-                // Kiểm tra lock để tránh double-processing
-                if (userLocks.has(userId)) {
-                    console.log(`🔒 User ${userId} đang bị lock, bỏ qua request`);
-                    return await interaction.reply({ content: '❌ Đang xử lý, vui lòng đợi!', ephemeral: true });
-                }
-                
-                userLocks.add(userId);
-                console.log(`🔒 Lock user ${userId} bắt đầu xử lý hủy nhà`);
-                
                 try {
                     const cityUser = await getCityUser(userId);
 
@@ -149,75 +126,75 @@ module.exports = {
                         return await interaction.reply({ content: '❌ Bạn không có nhà để hủy!', ephemeral: true });
                     }
 
-                const houseInfo = HOUSE_TYPES[cityUser.home];
-                if (!houseInfo) {
-                    return await interaction.reply({ content: '❌ Lỗi: Không tìm thấy thông tin nhà!', ephemeral: true });
-                }
+                    const houseInfo = HOUSE_TYPES[cityUser.home];
+                    if (!houseInfo) {
+                        return await interaction.reply({ content: '❌ Lỗi: Không tìm thấy thông tin nhà!', ephemeral: true });
+                    }
 
-                const refundAmount = Math.floor(houseInfo.price * 0.5);
-                const oldHouseThumbnail = HOUSE_IMAGES[cityUser.home] || null;
+                    const refundAmount = Math.floor(houseInfo.price * 0.5);
+                    const oldHouseThumbnail = HOUSE_IMAGES[cityUser.home] || null;
 
-                console.log(`🏠 DEBUG: User ${userId} hủy nhà ${cityUser.home}`);
+                    console.log(`🏠 DEBUG: User ${userId} hủy nhà ${cityUser.home}`);
 
-                // Hoàn tiền và xóa nhà, nghề
-                try {
-                    await updateUserRin(userId, refundAmount);
-                    
-                    const updateResult = await updateCityUser(userId, {
-                        home: null,
-                        job: null,
-                        workProgress: 0,
-                        lastWork: null,
-                        workStartTime: null,
-                        lastRepair: null,
-                        dailyMoneySteal: 0
-                    });
+                    // Hoàn tiền và xóa nhà, nghề
+                    try {
+                        await updateUserRin(userId, refundAmount);
+                        
+                        const updateResult = await updateCityUser(userId, {
+                            home: null,
+                            job: null,
+                            workProgress: 0,
+                            lastWork: null,
+                            workStartTime: null,
+                            lastRepair: null,
+                            dailyMoneySteal: 0
+                        });
 
-                    console.log(`🏠 DEBUG: Kết quả update:`, updateResult ? 'thành công' : 'thất bại');
-                } catch (updateError) {
-                    console.error(`❌ LỖI UPDATE DATABASE:`, updateError);
-                    return await interaction.reply({ 
-                        content: '❌ Có lỗi xảy ra khi cập nhật database! Vui lòng thử lại sau.', 
-                        ephemeral: true 
-                    });
-                }
+                        console.log(`🏠 DEBUG: Kết quả update:`, updateResult ? 'thành công' : 'thất bại');
+                    } catch (updateError) {
+                        console.error(`❌ LỖI UPDATE DATABASE:`, updateError);
+                        return await interaction.reply({ 
+                            content: '❌ Có lỗi xảy ra khi cập nhật database! Vui lòng thử lại sau.', 
+                            ephemeral: true 
+                        });
+                    }
 
-                // Kiểm tra lại để đảm bảo đã xóa thành công
-                const verifyUser = await getCityUser(userId);
-                console.log(`🏠 DEBUG: Verify user sau khi xóa:`, { home: verifyUser.home, job: verifyUser.job });
+                    // Kiểm tra lại để đảm bảo đã xóa thành công
+                    const verifyUser = await getCityUser(userId);
+                    console.log(`🏠 DEBUG: Verify user sau khi xóa:`, { home: verifyUser.home, job: verifyUser.job });
 
-                // Kiểm tra xem update có thành công không
-                if (verifyUser.home !== null || verifyUser.job !== null) {
-                    console.error(`❌ LỖI: Update database thất bại! User vẫn có home=${verifyUser.home}, job=${verifyUser.job}`);
-                    return await interaction.reply({ 
-                        content: '❌ Có lỗi xảy ra khi hủy nhà! Vui lòng liên hệ admin để được hỗ trợ.', 
-                        ephemeral: true 
-                    });
-                }
+                    // Kiểm tra xem update có thành công không
+                    if (verifyUser.home !== null || verifyUser.job !== null) {
+                        console.error(`❌ LỖI: Update database thất bại! User vẫn có home=${verifyUser.home}, job=${verifyUser.job}`);
+                        return await interaction.reply({ 
+                            content: '❌ Có lỗi xảy ra khi hủy nhà! Vui lòng liên hệ admin để được hỗ trợ.', 
+                            ephemeral: true 
+                        });
+                    }
 
-                const embed = new EmbedBuilder()
-                    .setTitle('✅ HỦY THUÊ NHÀ THÀNH CÔNG!')
-                    .setDescription(`**${houseInfo.name}** đã được hủy thành công! 🏠\n\n` +
-                        `**💵 Tiền hoàn lại:** ${refundAmount} Rin\n\n` +
-                        `**📋 Tình trạng hiện tại:**\n` +
-                        `• Nhà: Không có\n` +
-                        `• Nghề: Không có\n\n` +
-                        `**🎯 Bước tiếp theo:**\n` +
-                        `• Dùng \`,thuenha\` để thuê nhà mới\n` +
-                        `• Sau đó dùng \`,dangkynghe\` để chọn nghề`)
-                    .setColor('#00FF00')
-                    .setThumbnail(oldHouseThumbnail)
-                    .setFooter({ text: 'Cảm ơn bạn đã sử dụng dịch vụ thuê nhà!' })
-                    .setTimestamp();
+                    const embed = new EmbedBuilder()
+                        .setTitle('✅ HỦY THUÊ NHÀ THÀNH CÔNG!')
+                        .setDescription(`**${houseInfo.name}** đã được hủy thành công! 🏠\n\n` +
+                            `**💵 Tiền hoàn lại:** ${refundAmount} Rin\n\n` +
+                            `**📋 Tình trạng hiện tại:**\n` +
+                            `• Nhà: Không có\n` +
+                            `• Nghề: Không có\n\n` +
+                            `**🎯 Bước tiếp theo:**\n` +
+                            `• Dùng \`,thuenha\` để thuê nhà mới\n` +
+                            `• Sau đó dùng \`,dangkynghe\` để chọn nghề`)
+                        .setColor('#00FF00')
+                        .setThumbnail(oldHouseThumbnail)
+                        .setFooter({ text: 'Cảm ơn bạn đã sử dụng dịch vụ thuê nhà!' })
+                        .setTimestamp();
 
-                // Update message để xóa buttons
-                if (!interaction.replied && !interaction.deferred) {
-                    await interaction.update({ embeds: [embed], components: [] });
-                }
+                    // Update message để xóa buttons
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.update({ embeds: [embed], components: [] });
+                    }
 
-                } finally {
-                    userLocks.delete(userId);
-                    console.log(`🔓 Unlock user ${userId} hoàn thành xử lý hủy nhà`);
+                } catch (error) {
+                    console.error('Lỗi xử lý hủy nhà:', error);
+                    await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
                 }
 
             } else {
