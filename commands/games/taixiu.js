@@ -265,6 +265,19 @@ module.exports = {
                     await gameMessage.edit({ embeds: [embed], components: views });
                 } catch (error) {
                     console.error('Không thể edit message game:', error);
+                    // Nếu không edit được, thử edit reply interaction
+                    try {
+                        await interaction.editReply({ embeds: [embed], components: views });
+                    } catch (editError) {
+                        console.error('Không thể edit reply:', editError);
+                    }
+                }
+            } else {
+                // Fallback: edit reply nếu không có messageId
+                try {
+                    await interaction.editReply({ embeds: [embed], components: views });
+                } catch (editError) {
+                    console.error('Không thể edit reply fallback:', editError);
                 }
             }
         } catch (error) {
@@ -283,63 +296,89 @@ module.exports = {
 
             // Xử lý nút bắt đầu nhanh (không cần game hiện tại)
             if (interaction.customId === 'taixiu_quick_start') {
-                // Kiểm tra xem đã có game trong channel này chưa
-                if (games.has(interaction.channel.id)) {
-                    await interaction.reply({
-                        content: '❌ Đã có phiên Tài Xỉu đang diễn ra trong channel này!',
-                        flags: 64
+                try {
+                    // Kiểm tra xem đã có game trong channel này chưa
+                    if (games.has(interaction.channel.id)) {
+                        await interaction.reply({
+                            content: '❌ Đã có phiên Tài Xỉu đang diễn ra trong channel này!',
+                            flags: 64
+                        });
+                        return;
+                    }
+
+                    // Kiểm tra tiền của người tạo phiên
+                    const hostData = await getUserRin(interaction.user.id);
+                    if (hostData.rin < 1000) {
+                        await interaction.reply({
+                            content: '❌ Bạn cần ít nhất **1,000 Rin** để làm nhà cái!',
+                            flags: 64
+                        });
+                        return;
+                    }
+
+                    // Defer reply trước để tránh timeout
+                    await interaction.deferReply();
+
+                    // Tạo game mới tự động
+                    const newGame = {
+                        host: interaction.user,
+                        bets: new Map(),
+                        participants: new Set(),
+                        channel: interaction.channel,
+                        session: getNextSession(),
+                        startTime: Date.now(),
+                        timeLeft: BETTING_TIME,
+                        started: false
+                    };
+
+                    games.set(interaction.channel.id, newGame);
+
+                    // Tạo display cầu 
+                    const cauDisplay = createCauDisplay(globalHistory);
+                    const phanDoDisplay = createPhanDoDisplay(globalHistory);
+
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🎲 TÀI XỈU - PHIÊN #${newGame.session.toString().padStart(4, '0')}`)
+                        .setDescription(`🎯 **Nhà cái:** ${interaction.user.displayName}\n` +
+                                      `⏰ **Thời gian cược:** ${BETTING_TIME / 1000}s\n` +
+                                      `💰 **Tỷ lệ:** 1:1 (ăn bao nhiêu thắng bấy nhiêu)\n\n` +
+                                      `🔥 **TÀI:** 11-17 điểm\n` +
+                                      `❄️ **XỈU:** 4-10 điểm\n\n` +
+                                      `📊 **Cầu hiện tại:** \`${cauDisplay.cauString || 'Chưa có lịch sử'}\`\n` +
+                                      `📈 **Phiên đồ:** \`Đã sẵn sàng\`\n\n` +
+                                      `⚡ **Phiên được tạo nhanh! Chọn cửa và đặt cược ngay!**\n\n` +
+                                      `👥 **Người cược:** 0 | **💰 Tổng tiền:** 0 Rin`)
+                        .setColor('#FFD700')
+                        .setThumbnail('https://img.icons8.com/emoji/96/000000/game-die.png')
+                        .setFooter({ text: `🚀 Phiên bắt đầu nhanh bởi ${interaction.user.displayName}`, iconURL: interaction.user.displayAvatarURL() })
+                        .setTimestamp();
+
+                    const betViews = createBetViews();
+                    
+                    const gameMessage = await interaction.editReply({
+                        embeds: [embed],
+                        components: betViews
                     });
+
+                    // Lưu message ID cho game
+                    newGame.messageId = gameMessage.id;
+
+                    // Bắt đầu countdown
+                    this.startCountdown(interaction, newGame);
+                    return;
+                    
+                } catch (error) {
+                    console.error('Lỗi quick start tài xỉu:', error);
+                    try {
+                        await interaction.reply({
+                            content: '❌ Có lỗi khi tạo phiên mới! Vui lòng thử lại.',
+                            flags: 64
+                        });
+                    } catch (replyError) {
+                        console.error('Không thể reply error:', replyError);
+                    }
                     return;
                 }
-
-                // Kiểm tra tiền của người tạo phiên
-                const hostData = await getUserRin(interaction.user.id);
-                if (hostData.rin < 1000) {
-                    await interaction.reply({
-                        content: '❌ Bạn cần ít nhất **1,000 Rin** để làm nhà cái!',
-                        flags: 64
-                    });
-                    return;
-                }
-
-                // Tạo game mới tự động
-                const newGame = {
-                    host: interaction.user,
-                    bets: new Map(),
-                    participants: new Set(),
-                    channel: interaction.channel,
-                    session: getNextSession(),
-                    startTime: Date.now(),
-                    timeLeft: BETTING_TIME,
-                    started: false
-                };
-
-                games.set(interaction.channel.id, newGame);
-
-                const embed = new EmbedBuilder()
-                    .setTitle(`🎲 TÀI XỈU - PHIÊN #${newGame.session.toString().padStart(4, '0')}`)
-                    .setDescription(`🎯 **Nhà cái:** ${interaction.user.displayName}\n` +
-                                  `⏰ **Thời gian cược:** ${BETTING_TIME / 1000}s\n` +
-                                  `💰 **Tỷ lệ:** 1:1 (ăn bao nhiêu thắng bấy nhiêu)\n\n` +
-                                  `🔥 **TÀI:** 11-17 điểm\n` +
-                                  `❄️ **XỈU:** 4-10 điểm\n\n` +
-                                  `📊 **Cầu hiện tại:** \`${createCauDisplay(globalHistory).cauString}\`\n` +
-                                  `📈 **Phiên đồ:** \`${createPhanDoDisplay(globalHistory).phanDoString}\`\n\n` +
-                                  `⚡ **Phiên được tạo nhanh! Chọn cửa và đặt cược ngay!**`)
-                    .setColor('#FFD700')
-                    .setFooter({ text: `🚀 Phiên bắt đầu nhanh bởi ${interaction.user.displayName}`, iconURL: interaction.user.displayAvatarURL() })
-                    .setTimestamp();
-
-                const betViews = createBetViews();
-                
-                await interaction.reply({
-                    embeds: [embed],
-                    components: [betViews]
-                });
-
-                // Bắt đầu countdown
-                this.startCountdown(interaction, newGame);
-                return;
             }
 
             const channelId = interaction.channel.id;
@@ -1035,17 +1074,31 @@ module.exports = {
                                     .setDescription('❌ Không có ai đặt cược, phiên đã bị hủy!')
                                     .setColor('#FF0000');
                                 
-                                await interaction.editReply({ 
-                                    embeds: [timeoutEmbed], 
-                                    components: [] 
-                                });
+                                try {
+                                    await interaction.editReply({ 
+                                        embeds: [timeoutEmbed], 
+                                        components: [] 
+                                    });
+                                } catch (editError) {
+                                    console.error('Không thể edit reply timeout:', editError);
+                                    // Fallback: gửi message mới
+                                    await interaction.followUp({ 
+                                        embeds: [timeoutEmbed], 
+                                        components: [] 
+                                    });
+                                }
                             }
                         }
                         return;
                     }
                     
-                    // Cập nhật game embed với thời gian
-                    await this.updateGameEmbed(interaction, game);
+                    // Cập nhật game embed với thời gian (chỉ nếu interaction vẫn còn hợp lệ)
+                    try {
+                        await this.updateGameEmbed(interaction, game);
+                    } catch (updateError) {
+                        console.log('⚠️ [TAIXIU] Interaction expired, stopping countdown updates');
+                        clearInterval(countdownInterval);
+                    }
                     
                 } catch (error) {
                     console.error('Lỗi countdown tài xỉu:', error);
