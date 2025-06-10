@@ -53,9 +53,12 @@ module.exports = {
         const userRin = await getUserRin(message.author.id);
         let statusDescription = '';
 
-        if (cityUser.currentMission) {
-            const mission = MISSIONS[cityUser.currentMission.type];
-            const startTime = new Date(cityUser.currentMission.startTime);
+        // Làm mới dữ liệu cityUser để đảm bảo có thông tin mới nhất
+        const freshCityUser = await getCityUser(message.author.id);
+
+        if (freshCityUser.currentMission) {
+            const mission = MISSIONS[freshCityUser.currentMission.type];
+            const startTime = new Date(freshCityUser.currentMission.startTime);
             const now = new Date();
             const elapsed = Math.floor((now - startTime) / (60 * 1000)); // phút
             const remaining = Math.max(0, mission.duration - elapsed);
@@ -89,7 +92,7 @@ module.exports = {
                 },
                 { 
                     name: '🏠 Nhà hiện tại', 
-                    value: this.getHouseName(cityUser.home), 
+                    value: this.getHouseName(freshCityUser.home), 
                     inline: true 
                 },
                 {
@@ -101,7 +104,7 @@ module.exports = {
                     inline: false
                 }
             )
-            .setColor(cityUser.currentMission ? COLORS.warning : COLORS.info)
+            .setColor(freshCityUser.currentMission ? COLORS.warning : COLORS.info)
             .setFooter({ text: 'Làm nhiệm vụ để kiếm Rin!' })
             .setTimestamp();
 
@@ -137,8 +140,11 @@ module.exports = {
 
     // Nhận nhiệm vụ mới
     async takeMission(message, cityUser, missionType) {
-        if (cityUser.currentMission) {
-            const currentMission = MISSIONS[cityUser.currentMission.type];
+        // Làm mới dữ liệu để kiểm tra trạng thái mới nhất
+        const freshCityUser = await getCityUser(message.author.id);
+        
+        if (freshCityUser.currentMission) {
+            const currentMission = MISSIONS[freshCityUser.currentMission.type];
             return message.reply(`❌ Bạn đang thực hiện nhiệm vụ **${currentMission.name}**! Hãy hoàn thành hoặc hủy nhiệm vụ hiện tại trước.`);
         }
 
@@ -176,11 +182,14 @@ module.exports = {
 
     // Hủy nhiệm vụ hiện tại
     async cancelMission(message, cityUser) {
-        if (!cityUser.currentMission) {
+        // Làm mới dữ liệu để kiểm tra trạng thái mới nhất
+        const freshCityUser = await getCityUser(message.author.id);
+        
+        if (!freshCityUser.currentMission) {
             return message.reply('❌ Bạn không có nhiệm vụ nào để hủy!');
         }
 
-        const mission = MISSIONS[cityUser.currentMission.type];
+        const mission = MISSIONS[freshCityUser.currentMission.type];
         
         // Tạo button xác nhận hủy
         const confirmButton = new ButtonBuilder()
@@ -209,12 +218,15 @@ module.exports = {
 
     // Hoàn thành nhiệm vụ
     async completeMission(message, cityUser) {
-        if (!cityUser.currentMission) {
+        // Làm mới dữ liệu để kiểm tra trạng thái mới nhất
+        const freshCityUser = await getCityUser(message.author.id);
+        
+        if (!freshCityUser.currentMission) {
             return message.reply('❌ Bạn không có nhiệm vụ nào để hoàn thành!');
         }
 
-        const mission = MISSIONS[cityUser.currentMission.type];
-        const startTime = new Date(cityUser.currentMission.startTime);
+        const mission = MISSIONS[freshCityUser.currentMission.type];
+        const startTime = new Date(freshCityUser.currentMission.startTime);
         const now = new Date();
         const elapsed = Math.floor((now - startTime) / (60 * 1000)); // phút
 
@@ -225,7 +237,7 @@ module.exports = {
 
         // Tính thưởng với bonus theo loại nhà
         let reward = mission.reward;
-        const houseBonus = this.getHouseBonus(cityUser.home);
+        const houseBonus = this.getHouseBonus(freshCityUser.home);
         const bonusAmount = Math.floor(reward * houseBonus);
         const totalReward = reward + bonusAmount;
 
@@ -233,7 +245,7 @@ module.exports = {
         await updateUserRin(message.author.id, totalReward);
         await updateCityUser(message.author.id, { 
             currentMission: null,
-            completedMissions: (cityUser.completedMissions || 0) + 1
+            completedMissions: (freshCityUser.completedMissions || 0) + 1
         });
 
         const embed = new EmbedBuilder()
@@ -243,7 +255,7 @@ module.exports = {
                 `**🏠 Bonus nhà:** +${bonusAmount.toLocaleString()} Rin (${Math.round(houseBonus * 100)}%)\n` +
                 `**💎 Tổng nhận:** ${totalReward.toLocaleString()} Rin\n\n` +
                 `**📊 Thống kê:**\n` +
-                `• Nhiệm vụ hoàn thành: ${(cityUser.completedMissions || 0) + 1}\n` +
+                `• Nhiệm vụ hoàn thành: ${(freshCityUser.completedMissions || 0) + 1}\n` +
                 `• Thời gian thực hiện: ${elapsed} phút\n\n` +
                 `**Chúc mừng bạn! 🎊**`)
             .setColor(COLORS.success)

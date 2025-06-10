@@ -23,6 +23,7 @@ module.exports = {
                     `• \`${prefix}rinhelp city\` - 🏙️ Hệ thống City (thuê nhà, nghề nghiệp)\n` +
                     `• \`${prefix}rinhelp games\` - 🎮 Các game giải trí\n` +
                     `• \`${prefix}rinhelp xidach\` - 🃏 Game Xì Dách chi tiết\n` +
+                    `• \`${prefix}rinhelp taixiu\` - 🎲 Game Tài Xỉu chi tiết\n` +
                     `• \`${prefix}rinhelp admin\` - ⚙️ Lệnh admin (chỉ mod)\n\n` +
                     '**🆘 Hỗ trợ thêm:**\n' +
                     `• Prefix hiện tại: \`${prefix}\`\n` +
@@ -257,6 +258,16 @@ module.exports = {
                 .setDescription('**Chơi game cùng bạn bè và bot AI!** 🎯')
                 .addFields(
                     { 
+                        name: '🎲 Tài Xỉu', 
+                        value: `• \`${prefix}taixiu\` - Mở phiên Tài Xỉu (làm nhà cái)\n` +
+                               `• **Cách chơi:** 3 xúc xắc, 11-17 = Tài, 4-10 = Xỉu\n` +
+                               `• **Tỷ lệ:** 1:1 (cược 100 thắng 200)\n` +
+                               `• **Tự động:** 60s cược → quay xúc xắc → kết quả\n` +
+                               `• **Đặc biệt:** Cược được cả 2 cửa, xem cầu/phiên đồ\n` +
+                               `• **Nút nhanh:** Kết thúc phiên có nút "Bắt đầu phiên mới"`, 
+                        inline: false 
+                    },
+                    { 
                         name: '🃏 Xì Dách', 
                         value: `• \`${prefix}xjgo\` - Mở bàn (người tạo làm nhà cái)\n` +
                                `• \`${prefix}xjbot\` - Chơi với Bot AI\n` +
@@ -352,6 +363,76 @@ module.exports = {
                 )
                 .setColor('#0099FF')
                 .setFooter({ text: 'Chúc bạn may mắn tại bàn Xì Dách!' });
+            
+            return await message.reply({ embeds: [embed] });
+        }
+
+        if (topic === 'taixiu') {
+            const embed = new EmbedBuilder()
+                .setTitle('🎲 HƯỚNG DẪN TÀI XỈU CHI TIẾT')
+                .setDescription('**Game xúc xắc truyền thống Việt Nam!** ⚀⚁⚂⚃⚄⚅')
+                .addFields(
+                    { 
+                        name: '🎯 Cách chơi cơ bản', 
+                        value: `**Mục tiêu:** Đoán tổng điểm 3 xúc xắc\n` +
+                               `• **🔥 TÀI:** Tổng 11-17 điểm\n` +
+                               `• **❄️ XỈU:** Tổng 4-10 điểm\n` +
+                               `• **Tỷ lệ:** 1:1 (cược 100, thắng nhận 200)\n` +
+                               `• **Đặc biệt:** Có thể cược cả 2 cửa cùng lúc!`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '🎮 Quy trình chơi', 
+                        value: `1. \`${prefix}taixiu\` - Mở phiên (làm nhà cái)\n` +
+                               `2. **60 giây cược:** Bấm nút TÀI/XỈU → nhập số Rin\n` +
+                               `3. **Tự động quay:** Hết thời gian → 3 xúc xắc quay\n` +
+                               `4. **Hiển thị từng viên:** Xúc xắc 1 → 2 → 3 → Kết quả\n` +
+                               `5. **Tính tiền:** Thắng thua theo kết quả\n` +
+                               `6. **Nút nhanh:** "🚀 Bắt đầu phiên mới" để tiếp tục`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '💰 Hệ thống cược', 
+                        value: `**Nhập số tiền:** 100, 1k, 50%, all, 1.5k...\n` +
+                               `**Cược đơn:** Chỉ chọn TÀI hoặc XỈU\n` +
+                               `**Cược kép:** Cược cả TÀI và XỈU (hedge bet)\n` +
+                               `**Cộng dồn:** Cược cùng cửa nhiều lần = cộng tổng\n` +
+                               `**Trừ tiền:** Tự động khi hết thời gian cược\n` +
+                               `**Hoàn tiền:** Thắng nhận gấp đôi, thua mất hết`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '📊 Cầu và Phiên đồ', 
+                        value: `**📈 Cầu:** Chuỗi kết quả liên tiếp (VD: T-T-X-T-T)\n` +
+                               `**📋 Phiên đồ:** Lịch sử 15 phiên gần nhất\n` +
+                               `• **Xem chi tiết:** Bấm nút "📊 Xem Phiên Đồ"\n` +
+                               `• **Thông tin:** Phiên, điểm, kết quả, xúc xắc\n` +
+                               `• **Phân tích:** Theo dõi xu hướng Tài/Xỉu`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '🎲 Hiệu ứng xúc xắc', 
+                        value: `**Giai đoạn 1:** Chuẩn bị quay → Đang lắc bát\n` +
+                               `**Giai đoạn 2:** Xúc xắc 1 dừng → Hiện số\n` +
+                               `**Giai đoạn 3:** Xúc xắc 2 dừng → Hiện 2 số\n` +
+                               `**Giai đoạn 4:** Xúc xắc 3 dừng → Hiện đầy đủ\n` +
+                               `**Kết quả:** Tổng điểm + So sánh + Chi tiết người chơi\n` +
+                               `**Emoji xúc xắc:** ⚀⚁⚂⚃⚄⚅ (mỗi số có biểu tượng riêng)`, 
+                        inline: false 
+                    },
+                    { 
+                        name: '⚡ Tips & Chiến thuật', 
+                        value: `• **Quan sát cầu:** Nếu TÀI dài → có thể sắp XỈU\n` +
+                               `• **Cược kép:** An toàn hơn nhưng lợi nhuận thấp\n` +
+                               `• **Quản lý vốn:** Không cược quá 10% tổng Rin\n` +
+                               `• **Tâm lý:** Không đuổi theo khi thua liên tiếp\n` +
+                               `• **Nhà cái:** Cần ít nhất 1,000 Rin để mở phiên\n` +
+                               `• **Nút nhanh:** Dùng để liên tục mở phiên mới`, 
+                        inline: false 
+                    }
+                )
+                .setColor('#FFD700')
+                .setFooter({ text: 'Chúc bạn may mắn và chơi có trách nhiệm! 🍀' });
             
             return await message.reply({ embeds: [embed] });
         }

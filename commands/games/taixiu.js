@@ -67,19 +67,13 @@ function createBetViews() {
         .setLabel('📊 Xem Phiên Đồ')
         .setStyle(ButtonStyle.Secondary);
 
-    const row1 = new ActionRowBuilder().addComponents(taiButton, xiuButton, historyButton);
-
-    const startButton = new ButtonBuilder()
-        .setCustomId('start_taixiu')
-        .setLabel('🎲 BẮT ĐẦU QUAY (Chỉ nhà cái)')
-        .setStyle(ButtonStyle.Danger);
-
     const cancelButton = new ButtonBuilder()
         .setCustomId('cancel_taixiu')
         .setLabel('❌ Hủy phiên')
         .setStyle(ButtonStyle.Secondary);
 
-    const row2 = new ActionRowBuilder().addComponents(startButton, cancelButton);
+    const row1 = new ActionRowBuilder().addComponents(taiButton, xiuButton, historyButton);
+    const row2 = new ActionRowBuilder().addComponents(cancelButton);
 
     return [row1, row2];
 }
@@ -515,56 +509,7 @@ module.exports = {
             return;
         }
 
-        if (interaction.customId === 'start_taixiu') {
-            try {
-                if (interaction.user.id !== game.host.id) {
-                    return interaction.reply({ content: '⛔ Chỉ nhà cái được bắt đầu!', flags: 64 });
-                }
 
-                if (game.started) {
-                    return interaction.reply({ content: '❌ Phiên đã bắt đầu rồi!', flags: 64 });
-                }
-
-                if (game.bets.size === 0) {
-                    return interaction.reply({ content: '❌ Chưa có ai cược! Cần ít nhất 1 người đặt cược.', flags: 64 });
-                }
-
-                // Defer update trước khi thực hiện logic phức tạp
-                await interaction.deferUpdate();
-
-                // Bắt đầu game
-                game.started = true;
-
-                // Trừ tiền tất cả người cược - Hỗ trợ multi-bet
-                for (const [userId, bet] of game.bets) {
-                    if (Array.isArray(bet)) {
-                        // Người này cược nhiều cửa
-                        for (const singleBet of bet) {
-                            await updateUserRin(userId, -singleBet.amount);
-                        }
-                    } else {
-                        // Cược đơn
-                        await updateUserRin(userId, -bet.amount);
-                    }
-                }
-
-                await this.executeGame(interaction, game);
-                return;
-                
-            } catch (error) {
-                console.error('Lỗi start_taixiu button:', error);
-                try {
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.reply({ content: '❌ Có lỗi khi bắt đầu phiên!', flags: 64 });
-                    } else {
-                        await interaction.followUp({ content: '❌ Có lỗi khi bắt đầu phiên!', flags: 64 });
-                    }
-                } catch (replyError) {
-                    console.error('Không thể reply start error:', replyError);
-                }
-                return;
-            }
-        }
 
         if (interaction.customId === 'cancel_taixiu') {
             if (interaction.user.id !== game.host.id && !interaction.member.permissions.has('Administrator')) {
