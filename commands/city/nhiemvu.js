@@ -55,6 +55,9 @@ module.exports = {
 
         // Làm mới dữ liệu cityUser để đảm bảo có thông tin mới nhất
         const freshCityUser = await getCityUser(message.author.id);
+        
+        console.log(`🎯 [NHIEMVU] Show status for user ${message.author.id}`);
+        console.log(`🎯 [NHIEMVU] Fresh user data:`, JSON.stringify(freshCityUser.currentMission, null, 2));
 
         if (freshCityUser.currentMission) {
             const mission = MISSIONS[freshCityUser.currentMission.type];
@@ -269,9 +272,13 @@ module.exports = {
     async handleInteraction(interaction) {
         if (!interaction.customId.startsWith('mission_')) return;
 
+        console.log(`🎯 [NHIEMVU] Processing interaction: ${interaction.customId}`);
+
         const parts = interaction.customId.split('_');
         const action = parts[1]; // confirm, cancel
         const userId = parts[parts.length - 1];
+
+        console.log(`🎯 [NHIEMVU] Parts: ${parts}, Action: ${action}, UserId: ${userId}`);
 
         if (interaction.user.id !== userId) {
             return interaction.reply({ content: '❌ Chỉ người nhận nhiệm vụ mới có thể thực hiện!', ephemeral: true });
@@ -279,22 +286,35 @@ module.exports = {
 
         try {
             const cityUser = await getCityUser(userId);
+            console.log(`🎯 [NHIEMVU] Current user data:`, JSON.stringify(cityUser.currentMission, null, 2));
 
             if (action === 'confirm') {
                 const missionType = parts[2];
                 const mission = MISSIONS[missionType];
 
+                console.log(`🎯 [NHIEMVU] Confirming mission: ${missionType}`, mission);
+
                 if (cityUser.currentMission) {
+                    console.log(`❌ [NHIEMVU] User already has mission:`, cityUser.currentMission);
                     return interaction.reply({ content: '❌ Bạn đã có nhiệm vụ rồi!', ephemeral: true });
                 }
 
                 // Nhận nhiệm vụ
-                await updateCityUser(userId, {
+                const updateData = {
                     currentMission: {
                         type: missionType,
                         startTime: new Date()
                     }
-                });
+                };
+                
+                console.log(`🎯 [NHIEMVU] Updating user with data:`, updateData);
+                
+                const updateResult = await updateCityUser(userId, updateData);
+                console.log(`🎯 [NHIEMVU] Update result:`, updateResult);
+
+                // Verify update
+                const verifyUser = await getCityUser(userId);
+                console.log(`🎯 [NHIEMVU] Verified user data after update:`, JSON.stringify(verifyUser.currentMission, null, 2));
 
                 const embed = new EmbedBuilder()
                     .setTitle('✅ NHẬN NHIỆM VỤ THÀNH CÔNG!')
