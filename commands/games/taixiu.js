@@ -402,16 +402,29 @@ module.exports = {
     // Thực thi game - quay xúc xắc và tính kết quả
     async executeGame(interaction, game) {
         try {
-            // Animation quay xúc xắc
-            const loadingEmbed = new EmbedBuilder()
+            // HIỆU ỨNG XÚC XẮC HỒI HỘP
+
+            // Bước 1: Bắt đầu quay
+            const startEmbed = new EmbedBuilder()
+                .setTitle(`🎲 BẮTĐẦU QUAY - PHIÊN #${game.session.toString().padStart(4, '0')}`)
+                .setDescription('🎯 **Chuẩn bị quay xúc xắc...**\n\n' +
+                              '🎲 ⚪ ⚪ ⚪\n' +
+                              '⏳ Đang lắc bát...')
+                .setColor('#FF6B6B');
+
+            await interaction.editReply({ embeds: [startEmbed], components: [] });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Bước 2: Đang quay 
+            const shakingEmbed = new EmbedBuilder()
                 .setTitle(`🎲 ĐANG QUAY XÚC XẮC - PHIÊN #${game.session.toString().padStart(4, '0')}`)
-                .setDescription('🎲🎲🎲 Đang lắc xúc xắc...')
+                .setDescription('🎯 **Xúc xắc đang lăn...**\n\n' +
+                              '🎲 ⚡ ⚡ ⚡\n' +
+                              '💫 Đang chờ kết quả...')
                 .setColor('#FFA500');
 
-            await interaction.editReply({ embeds: [loadingEmbed], components: [] });
-
-            // Delay cho animation
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await interaction.editReply({ embeds: [shakingEmbed] });
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             // Tính bias dựa trên tổng tiền cược và xu hướng người chơi
             let totalBetAmount = 0;
@@ -510,6 +523,91 @@ module.exports = {
             const total = dice1 + dice2 + dice3;
             const result = total >= 11 ? 'tai' : 'xiu';
 
+            // HIỆU ỨNG HIỂN THỊ XÚC XẮC ĐẸP
+            function getDiceImageUrl(number) {
+                // Sử dụng static dice images đẹp - GitHub hosted
+                const diceUrls = {
+                    1: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png',
+                    2: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png', 
+                    3: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png',
+                    4: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png',
+                    5: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png',
+                    6: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Game%20die/3D/game_die_3d.png'
+                };
+                return diceUrls[number];
+            }
+
+            function getDiceEmoji(number) {
+                // Unicode dice emojis đẹp hơn
+                const diceEmojis = {
+                    1: '🔹',
+                    2: '🔸', 
+                    3: '🔶',
+                    4: '🔷',
+                    5: '🔴',
+                    6: '🟠'
+                };
+                return diceEmojis[number] || '🎲';
+            }
+
+            function getDiceVisual(number) {
+                // Tạo visual dice với art ASCII
+                const diceVisuals = {
+                    1: '┌─────┐\n│  ●  │\n│     │\n│     │\n└─────┘',
+                    2: '┌─────┐\n│ ●   │\n│     │\n│   ● │\n└─────┘',
+                    3: '┌─────┐\n│ ●   │\n│  ●  │\n│   ● │\n└─────┘',
+                    4: '┌─────┐\n│ ● ● │\n│     │\n│ ● ● │\n└─────┘',
+                    5: '┌─────┐\n│ ● ● │\n│  ●  │\n│ ● ● │\n└─────┘',
+                    6: '┌─────┐\n│ ● ● │\n│ ● ● │\n│ ● ● │\n└─────┘'
+                };
+                return diceVisuals[number] || '🎲';
+            }
+
+            // Bước 3: Hiển thị từng xúc xắc một cách hồi hộp
+            const dice1Url = getDiceImageUrl(dice1);
+            const dice2Url = getDiceImageUrl(dice2);
+            const dice3Url = getDiceImageUrl(dice3);
+
+            // Hiển thị xúc xắc đầu tiên
+            const reveal1Embed = new EmbedBuilder()
+                .setTitle(`🎲 XÚC XẮC THỨ NHẤT - PHIÊN #${game.session.toString().padStart(4, '0')}`)
+                .setDescription(`🎯 **Xúc xắc đầu tiên ra kết quả:**\n\n` +
+                              `\`\`\`\n${getDiceVisual(dice1)}\n\`\`\`\n` +
+                              `${getDiceEmoji(dice1)} **Số ${dice1}** | ⚪ ⚪\n` +
+                              `⏳ Đang chờ 2 xúc xắc còn lại...`)
+                .setImage(dice1Url)
+                .setColor('#4ECDC4');
+            
+            await interaction.editReply({ embeds: [reveal1Embed] });
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            // Hiển thị xúc xắc thứ hai  
+            const reveal2Embed = new EmbedBuilder()
+                .setTitle(`🎲 XÚC XẮC THỨ HAI - PHIÊN #${game.session.toString().padStart(4, '0')}`)
+                .setDescription(`🎯 **Hai xúc xắc đã ra:**\n\n` +
+                              `\`\`\`\n${getDiceVisual(dice2)}\n\`\`\`\n` +
+                              `${getDiceEmoji(dice1)} **${dice1}** | ${getDiceEmoji(dice2)} **${dice2}** | ⚪\n` +
+                              `⏳ Còn 1 xúc xắc quyết định cuối cùng...`)
+                .setImage(dice2Url)
+                .setColor('#45B7D1');
+            
+            await interaction.editReply({ embeds: [reveal2Embed] });
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            // Hiển thị xúc xắc cuối và kết quả drama
+            const suspenseEmbed = new EmbedBuilder()
+                .setTitle(`🎲 XÚC XẮC CUỐI CÙNG - PHIÊN #${game.session.toString().padStart(4, '0')}`)
+                .setDescription(`🎯 **Xúc xắc cuối cùng quyết định:**\n\n` +
+                              `\`\`\`\n${getDiceVisual(dice3)}\n\`\`\`\n` +
+                              `${getDiceEmoji(dice1)} **${dice1}** | ${getDiceEmoji(dice2)} **${dice2}** | ${getDiceEmoji(dice3)} **${dice3}**\n\n` +
+                              `🔥 **TỔNG CỘNG: ${total} ĐIỂM**\n` +
+                              `⏳ Đang tính toán kết quả...`)
+                .setImage(dice3Url)
+                .setColor('#9B59B6');
+            
+            await interaction.editReply({ embeds: [suspenseEmbed] });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             // Log rigged info for admin (optional)
             if (riggedSettings.logRigged && riggedSettings.enabled) {
                 const biasDescription = riggedSettings.riggedMode === 'aggressive' ? 'AGGRESSIVE' : 'SMART';
@@ -573,18 +671,61 @@ module.exports = {
                 await updateUserRin(game.host.id, totalHostWinnings);
             }
 
-            // Hiển thị kết quả
-            const resultEmbed = new EmbedBuilder()
-                .setTitle(`🎲 KẾT QUẢ PHIÊN #${game.session.toString().padStart(4, '0')}`)
-                .setDescription(`**🎯 Xúc xắc:** ${dice1} - ${dice2} - ${dice3}\n` +
-                    `**📊 Tổng điểm:** ${total}\n` +
-                    `**🏆 Kết quả:** ${result === 'tai' ? '🔺 TÀI' : '🔻 XỈU'}\n\n` +
-                    `**👥 Chi tiết người chơi:**\n${resultText}\n` +
-                    `**💰 Nhà cái:** ${totalHostWinnings >= 0 ? `+${totalHostWinnings.toLocaleString()}` : totalHostWinnings.toLocaleString()} Rin`)
-                .setColor(result === 'tai' ? '#FF4444' : '#4444FF')
-                .setFooter({ text: `Cầu mới: ${createCauDisplay(globalHistory).cauString}` });
+            // HIỆU ỨNG KẾT QUẢ DRAMATIC
+            
+            // Bước 4: Công bố kết quả với drama
+            const resultColor = result === 'tai' ? '#FF4444' : '#4444FF';
+            const resultIcon = result === 'tai' ? '🔺' : '🔻';
+            const resultText_drama = result === 'tai' ? 'TÀI' : 'XỈU';
 
-            await interaction.editReply({ embeds: [resultEmbed] });
+            const dramaBuildupEmbed = new EmbedBuilder()
+                .setTitle(`🎯 CÔNG BỐ KẾT QUẢ - PHIÊN #${game.session.toString().padStart(4, '0')}`)
+                .setDescription(`**🎲 BA XÚC XẮC CUỐI CÙNG:**\n\n` +
+                              `🎲 **${dice1}** | 🎲 **${dice2}** | 🎲 **${dice3}**\n\n` +
+                              `🔥 **TỔNG CỘNG: ${total} ĐIỂM**\n\n` +
+                              `${total >= 11 ? '🔺' : '🔻'} **KẾT QUẢ: ${resultText_drama}**\n\n` +
+                              `💥 ${result === 'tai' ? 'TÀI THẮNG!' : 'XỈU THẮNG!'}`)
+                .addFields(
+                    { name: '🎲 Xúc xắc 1', value: `**${dice1}**`, inline: true },
+                    { name: '🎲 Xúc xắc 2', value: `**${dice2}**`, inline: true },
+                    { name: '🎲 Xúc xắc 3', value: `**${dice3}**`, inline: true }
+                )
+                .setImage(dice1Url) // Hiển thị xúc xắc đại diện
+                .setThumbnail(dice3Url) // Xúc xắc thứ 3 làm thumbnail
+                .setColor(resultColor);
+            
+            await interaction.editReply({ embeds: [dramaBuildupEmbed] });
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Bước 5: Hiển thị kết quả chi tiết
+            const finalResultEmbed = new EmbedBuilder()
+                .setTitle(`🏆 BẢNG KẾT QUẢ PHIÊN #${game.session.toString().padStart(4, '0')}`)
+                .setDescription(
+                    `🎲 **KẾT QUẢ 3 XÚC XẮC:**\n` +
+                    `📊 **TỔNG ĐIỂM:** ${total} điểm\n` +
+                    `🏆 **KẾT QUẢ:** ${resultIcon} **${resultText_drama}**\n\n` +
+                    `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
+                    `┃            **📊 CHI TIẾT NGƯỜI CHƠI**           ┃\n` +
+                    `┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n` +
+                    `${resultText}\n` +
+                    `💎 **Nhà cái ${game.host.displayName}:** ${totalHostWinnings >= 0 ? `+${totalHostWinnings.toLocaleString()}` : totalHostWinnings.toLocaleString()} Rin\n\n` +
+                    `🎯 **Cầu mới:** \`${createCauDisplay(globalHistory).cauString}\``
+                )
+                .addFields(
+                    { name: '🎲 Xúc xắc 1', value: `**${dice1}**`, inline: true },
+                    { name: '🎲 Xúc xắc 2', value: `**${dice2}**`, inline: true },
+                    { name: '🎲 Xúc xắc 3', value: `**${dice3}**`, inline: true }
+                )
+                .setImage(dice2Url) // Hiển thị xúc xắc thứ 2 làm ảnh chính
+                .setThumbnail(dice1Url) // Xúc xắc thứ 1 làm thumbnail
+                .setColor(resultColor)
+                .setFooter({ 
+                    text: `Phiên hoàn thành | Chơi tiếp với ,taixiu`, 
+                    iconURL: game.host.displayAvatarURL() 
+                })
+                .setTimestamp();
+
+            await interaction.editReply({ embeds: [finalResultEmbed] });
 
             // Xóa game
             games.delete(interaction.channel.id);

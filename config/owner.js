@@ -1,6 +1,6 @@
 module.exports = {
     // Discord ID của owner bot
-    ownerId: '429078973562093569', // Thay đổi thành ID Discord của bạn
+    ownerId: '429078973562093569,1328980118223458388', // Thay đổi thành ID Discord của bạn
     
     // Thông tin owner (không bắt buộc)
     ownerInfo: {
