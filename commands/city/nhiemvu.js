@@ -61,22 +61,33 @@ module.exports = {
 
         if (freshCityUser.currentMission) {
             const mission = MISSIONS[freshCityUser.currentMission.type];
-            const startTime = new Date(freshCityUser.currentMission.startTime);
-            const now = new Date();
-            const elapsed = Math.floor((now - startTime) / (60 * 1000)); // phút
-            const remaining = Math.max(0, mission.duration - elapsed);
-
-            if (remaining > 0) {
-                statusDescription = `**📋 Nhiệm vụ đang thực hiện:**\n` +
-                    `${mission.emoji} **${mission.name}**\n` +
-                    `⏰ Còn lại: **${remaining} phút**\n` +
-                    `💰 Thưởng: **${mission.reward.toLocaleString()} Rin**\n\n` +
-                    `*Dùng \`,nhiemvu hoanthanh\` khi hoàn thành!*`;
+            
+            // Kiểm tra mission có tồn tại không
+            if (!mission) {
+                console.log(`❌ [NHIEMVU] Mission type '${freshCityUser.currentMission.type}' not found in MISSIONS`);
+                // Xóa mission không hợp lệ
+                await updateCityUser(message.author.id, { currentMission: null });
+                statusDescription = `**💼 Chưa có nhiệm vụ nào**\n\n` +
+                    `Bạn có thể nhận nhiệm vụ mới để kiếm tiền!\n` +
+                    `Dùng \`,nhiemvu list\` để xem danh sách nhiệm vụ.`;
             } else {
-                statusDescription = `**✅ Nhiệm vụ hoàn thành!**\n` +
-                    `${mission.emoji} **${mission.name}**\n` +
-                    `💰 Nhận thưởng: **${mission.reward.toLocaleString()} Rin**\n\n` +
-                    `*Dùng \`,nhiemvu hoanthanh\` để nhận thưởng!*`;
+                const startTime = new Date(freshCityUser.currentMission.startTime);
+                const now = new Date();
+                const elapsed = Math.floor((now - startTime) / (60 * 1000)); // phút
+                const remaining = Math.max(0, mission.duration - elapsed);
+
+                if (remaining > 0) {
+                    statusDescription = `**📋 Nhiệm vụ đang thực hiện:**\n` +
+                        `${mission.emoji} **${mission.name}**\n` +
+                        `⏰ Còn lại: **${remaining} phút**\n` +
+                        `💰 Thưởng: **${mission.reward.toLocaleString()} Rin**\n\n` +
+                        `*Dùng \`,nhiemvu hoanthanh\` khi hoàn thành!*`;
+                } else {
+                    statusDescription = `**✅ Nhiệm vụ hoàn thành!**\n` +
+                        `${mission.emoji} **${mission.name}**\n` +
+                        `💰 Nhận thưởng: **${mission.reward.toLocaleString()} Rin**\n\n` +
+                        `*Dùng \`,nhiemvu hoanthanh\` để nhận thưởng!*`;
+                }
             }
         } else {
             statusDescription = `**💼 Chưa có nhiệm vụ nào**\n\n` +
