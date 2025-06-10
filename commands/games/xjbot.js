@@ -119,6 +119,9 @@ module.exports = {
             return message.reply('❌ Đã có ván Xì Dách Bot trong kênh này!');
         }
 
+        // CHECK ÂM TIỀN - Bot AI chấp nhận mọi người chơi nhưng nhà cái âm tiền không được làm game với người khác
+        // Ở đây ai cũng có thể chơi với Bot nên không cần check
+
         botGames.set(channelId, {
             players: new Map(), // userId -> {bet, cards, status}
             deck: createDeck(),

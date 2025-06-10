@@ -133,17 +133,18 @@ module.exports = {
     },
     createSimpleAnimation(finalSymbols) {
         const symbols = Object.values(SYMBOLS).map(s => s.icon);
-        const extraSymbols = ['🎰', '🎲', '🔄', '💫', '⚡', '🌟', '🍀', '💰'];
+        const extraSymbols = ['🎰', '🎲', '🔄', '💫', '⚡'];
         const allSymbols = [...symbols, ...extraSymbols];
         const frames = [];
 
-        for (let i = 0; i < 20; i++) {
+        // Giảm từ 20 frames xuống 12 frames để nhanh hơn
+        for (let i = 0; i < 12; i++) {
             const frame = [];
             for (let j = 0; j < 3; j++) {
-                if (i < 16) {
+                if (i < 8) {
                     frame.push(allSymbols[Math.floor(Math.random() * allSymbols.length)]);
-                } else if (i < 18) {
-                    if (Math.random() < 0.5) {
+                } else if (i < 10) {
+                    if (Math.random() < 0.7) {
                         frame.push(finalSymbols[j]);
                     } else {
                         frame.push(symbols[Math.floor(Math.random() * symbols.length)]);
@@ -178,11 +179,11 @@ module.exports = {
 
         if (!isLastFrame) {
             let delay;
-            if (frameIndex < 8) delay = 80;
-            else if (frameIndex < 12) delay = 100;
-            else if (frameIndex < 16) delay = 150;
-            else if (frameIndex < 19) delay = 250;
-            else delay = 400;
+            if (frameIndex < 4) delay = 60;     // Nhanh hơn
+            else if (frameIndex < 6) delay = 80;
+            else if (frameIndex < 8) delay = 100;
+            else if (frameIndex < 10) delay = 150;
+            else delay = 200;
 
             setTimeout(() => {
                 this.showAnimationFrame(message, amount, finalResultKeys, animationFrames, frameIndex + 1);

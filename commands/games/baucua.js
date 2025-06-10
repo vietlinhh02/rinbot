@@ -129,6 +129,15 @@ module.exports = {
             return message.reply('❌ Đã có ván Bầu Cua trong kênh này!');
         }
 
+        // CHECK ÂM TIỀN - Không cho phép quản trò âm tiền làm game
+        const { getUserRin } = require('../../utils/database');
+        const hostRin = await getUserRin(message.author.id);
+        if (hostRin < 0) {
+            return message.reply(`❌ **Không thể làm quản trò Bầu Cua!**\n\n` +
+                `**Lý do:** Bạn đang âm tiền (${hostRin} Rin)\n\n` +
+                `💡 **Hướng dẫn:** Kiếm tiền để có số dư dương trước khi làm quản trò!`);
+        }
+
         // Tạo ván game mới
         games.set(channelId, {
             host: message.author,
@@ -358,11 +367,11 @@ module.exports = {
 
             // Chỉ hoàn tiền nếu game đã bắt đầu (đã trừ tiền)
             if (game.started) {
-                for (const [userId, userBets] of game.bets) {
-                    const totalRefund = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
-                    if (totalRefund > 0) {
-                        await FastUtils.updateFastUserRin(userId, totalRefund);
-                    }
+            for (const [userId, userBets] of game.bets) {
+                const totalRefund = Object.values(userBets).reduce((sum, amount) => sum + amount, 0);
+                if (totalRefund > 0) {
+                    await FastUtils.updateFastUserRin(userId, totalRefund);
+                }
                 }
                 cancelMessage = '❌ Ván Bầu Cua đã bị hủy! Đã hoàn tiền cho tất cả người chơi.';
             } else {
@@ -379,4 +388,4 @@ module.exports = {
             await interaction.reply({ embeds: [cancelEmbed] });
         }
     }
-};
+}; 

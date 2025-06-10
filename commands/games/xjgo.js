@@ -1180,6 +1180,21 @@ module.exports = {
                 return await message.reply({ embeds: [embed] });
             }
 
+            // CHECK ÂM TIỀN - Không cho phép nhà cái âm tiền làm game
+            const hostRin = await getUserRin(message.author.id);
+            if (hostRin < 0) {
+                const embed = new EmbedBuilder()
+                    .setTitle('❌ Không thể làm nhà cái!')
+                    .setDescription(`**Lý do:** Bạn đang âm tiền (${hostRin} Rin)\n\n` +
+                        `**💡 Hướng dẫn:**\n` +
+                        `• Kiếm tiền để có số dư dương trước khi làm nhà cái\n` +
+                        `• Dùng \`,daily\` để nhận 100-500 Rin/ngày\n` +
+                        `• Tham gia game của người khác để kiếm tiền\n\n` +
+                        `⚠️ **Lưu ý:** Nhà cái có thể mất tiền nếu người chơi thắng`)
+                    .setColor('#FF0000');
+                return await message.reply({ embeds: [embed] });
+            }
+
             global.games[channelId] = {
                 host: message.author,
                 players: {},
