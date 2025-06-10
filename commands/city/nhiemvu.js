@@ -159,7 +159,12 @@ module.exports = {
         
         if (freshCityUser.currentMission) {
             const currentMission = MISSIONS[freshCityUser.currentMission.type];
-            return message.reply(`❌ Bạn đang thực hiện nhiệm vụ **${currentMission.name}**! Hãy hoàn thành hoặc hủy nhiệm vụ hiện tại trước.`);
+            if (currentMission) {
+                return message.reply(`❌ Bạn đang thực hiện nhiệm vụ **${currentMission.name}**! Hãy hoàn thành hoặc hủy nhiệm vụ hiện tại trước.`);
+            } else {
+                // Xóa mission không hợp lệ
+                await updateCityUser(message.author.id, { currentMission: null });
+            }
         }
 
         const mission = MISSIONS[missionType.toLowerCase()];
@@ -310,12 +315,10 @@ module.exports = {
                     return interaction.reply({ content: '❌ Bạn đã có nhiệm vụ rồi!', ephemeral: true });
                 }
 
-                // Nhận nhiệm vụ
+                // Nhận nhiệm vụ - dùng dot notation cho nested object
                 const updateData = {
-                    currentMission: {
-                        type: missionType,
-                        startTime: new Date()
-                    }
+                    'currentMission.type': missionType,
+                    'currentMission.startTime': new Date()
                 };
                 
                 console.log(`🎯 [NHIEMVU] Updating user with data:`, updateData);
