@@ -402,7 +402,7 @@ client.on('interactionCreate', async (interaction) => {
 
         // Xử lý interactions cho Bầu Cua (người dùng làm nhà cái)  
         if (interaction.customId && (
-            interaction.customId.startsWith('bet_') ||
+            (interaction.customId.startsWith('bet_') && !interaction.customId.startsWith('bet_tai') && !interaction.customId.startsWith('bet_xiu')) ||
             interaction.customId === 'confirm_bet' ||
             interaction.customId === 'start_game' ||
             interaction.customId === 'cancel_game' ||
@@ -491,6 +491,42 @@ client.on('interactionCreate', async (interaction) => {
             const xjbotCommand = client.commands.get('xjbot');
             if (xjbotCommand && xjbotCommand.handleInteraction) {
                 await xjbotCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
+        // Xử lý interactions cho Tài Xỉu
+        if (interaction.customId && (
+            interaction.customId === 'bet_tai' ||
+            interaction.customId === 'bet_xiu' ||
+            interaction.customId === 'view_history' ||
+            interaction.customId === 'start_taixiu' ||
+            interaction.customId === 'cancel_taixiu'
+        )) {
+            console.log(`🎲 [TAIXIU] Processing button interaction: ${interaction.customId}`);
+            const taixiuCommand = client.commands.get('taixiu');
+            if (taixiuCommand && taixiuCommand.handleInteraction) {
+                try {
+                    await taixiuCommand.handleInteraction(interaction);
+                    console.log(`✅ [TAIXIU] Button interaction processed successfully: ${interaction.customId}`);
+                } catch (error) {
+                    console.error(`❌ [TAIXIU] Button interaction error:`, error);
+                }
+            }
+            return;
+        }
+
+        // Xử lý modal submit cho Tài Xỉu
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('taixiu_bet_modal_')) {
+            console.log(`🎲 [TAIXIU] Processing modal interaction: ${interaction.customId}`);
+            const taixiuCommand = client.commands.get('taixiu');
+            if (taixiuCommand && taixiuCommand.handleInteraction) {
+                try {
+                    await taixiuCommand.handleInteraction(interaction);
+                    console.log(`✅ [TAIXIU] Modal interaction processed successfully: ${interaction.customId}`);
+                } catch (error) {
+                    console.error(`❌ [TAIXIU] Modal interaction error:`, error);
+                }
             }
             return;
         }
@@ -688,8 +724,13 @@ client.on('interactionCreate', async (interaction) => {
 
     } catch (error) {
         console.error('Lỗi interaction:', error);
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '❌ Có lỗi xảy ra!', flags: 64 });
+        // Chỉ reply nếu là lỗi thực sự và interaction chưa được xử lý
+        if (!interaction.replied && !interaction.deferred && error.code !== 40060) {
+            try {
+                await interaction.reply({ content: '❌ Có lỗi xảy ra!', flags: 64 });
+            } catch (replyError) {
+                console.error('Không thể reply interaction error:', replyError.message);
+            }
         }
     }
 });
