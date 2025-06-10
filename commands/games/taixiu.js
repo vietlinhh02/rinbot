@@ -6,6 +6,7 @@ const { validateBetAmount } = require('../../utils/betModal');
 const games = new Map();
 let globalHistory = []; // Lịch sử toàn bộ server
 const MAX_HISTORY = 50; // Lưu tối đa 50 phiên
+const BETTING_TIME = 60000; // 60 giây để cược
 
 // Load history từ file khi khởi động
 try {
@@ -24,6 +25,11 @@ try {
 
 // Phiên game counter - bắt đầu từ phiên cuối cùng + 1
 let gameSession = globalHistory.length > 0 ? Math.max(...globalHistory.map(h => h.session)) + 1 : 1;
+
+// Helper function để lấy session tiếp theo
+function getNextSession() {
+    return gameSession++;
+}
 
 // Modal để nhập tiền cược
 class BetModal extends ModalBuilder {
@@ -195,16 +201,34 @@ module.exports = {
 
             for (const [userId, bet] of game.bets) {
                 const user = await interaction.client.users.fetch(userId);
-                const playerInfo = `• **${user.displayName}**: ${bet.amount.toLocaleString()} Rin`;
                 
-                if (bet.type === 'tai') {
-                    taiPlayers.push(playerInfo);
+                if (Array.isArray(bet)) {
+                    // Người này cược nhiều cửa
+                    for (const singleBet of bet) {
+                        const playerInfo = `• **${user.displayName}**: ${singleBet.amount.toLocaleString()} Rin`;
+                        
+                        if (singleBet.type === 'tai') {
+                            taiPlayers.push(playerInfo);
+                        } else {
+                            xiuPlayers.push(playerInfo);
+                        }
+                        
+                        totalAmount += singleBet.amount;
+                    }
+                    totalPlayers++;
                 } else {
-                    xiuPlayers.push(playerInfo);
+                    // Cược đơn
+                    const playerInfo = `• **${user.displayName}**: ${bet.amount.toLocaleString()} Rin`;
+                    
+                    if (bet.type === 'tai') {
+                        taiPlayers.push(playerInfo);
+                    } else {
+                        xiuPlayers.push(playerInfo);
+                    }
+                    
+                    totalAmount += bet.amount;
+                    totalPlayers++;
                 }
-                
-                totalAmount += bet.amount;
-                totalPlayers++;
             }
 
             const cauDisplay = createCauDisplay(globalHistory);
@@ -257,6 +281,67 @@ module.exports = {
                 return;
             }
 
+            // Xử lý nút bắt đầu nhanh (không cần game hiện tại)
+            if (interaction.customId === 'taixiu_quick_start') {
+                // Kiểm tra xem đã có game trong channel này chưa
+                if (games.has(interaction.channel.id)) {
+                    await interaction.reply({
+                        content: '❌ Đã có phiên Tài Xỉu đang diễn ra trong channel này!',
+                        flags: 64
+                    });
+                    return;
+                }
+
+                // Kiểm tra tiền của người tạo phiên
+                const hostData = await getUserRin(interaction.user.id);
+                if (hostData.rin < 1000) {
+                    await interaction.reply({
+                        content: '❌ Bạn cần ít nhất **1,000 Rin** để làm nhà cái!',
+                        flags: 64
+                    });
+                    return;
+                }
+
+                // Tạo game mới tự động
+                const newGame = {
+                    host: interaction.user,
+                    bets: new Map(),
+                    participants: new Set(),
+                    channel: interaction.channel,
+                    session: getNextSession(),
+                    startTime: Date.now(),
+                    timeLeft: BETTING_TIME,
+                    started: false
+                };
+
+                games.set(interaction.channel.id, newGame);
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`🎲 TÀI XỈU - PHIÊN #${newGame.session.toString().padStart(4, '0')}`)
+                    .setDescription(`🎯 **Nhà cái:** ${interaction.user.displayName}\n` +
+                                  `⏰ **Thời gian cược:** ${BETTING_TIME / 1000}s\n` +
+                                  `💰 **Tỷ lệ:** 1:1 (ăn bao nhiêu thắng bấy nhiêu)\n\n` +
+                                  `🔥 **TÀI:** 11-17 điểm\n` +
+                                  `❄️ **XỈU:** 4-10 điểm\n\n` +
+                                  `📊 **Cầu hiện tại:** \`${createCauDisplay(globalHistory).cauString}\`\n` +
+                                  `📈 **Phiên đồ:** \`${createPhanDoDisplay(globalHistory).phanDoString}\`\n\n` +
+                                  `⚡ **Phiên được tạo nhanh! Chọn cửa và đặt cược ngay!**`)
+                    .setColor('#FFD700')
+                    .setFooter({ text: `🚀 Phiên bắt đầu nhanh bởi ${interaction.user.displayName}`, iconURL: interaction.user.displayAvatarURL() })
+                    .setTimestamp();
+
+                const betViews = createBetViews();
+                
+                await interaction.reply({
+                    embeds: [embed],
+                    components: [betViews]
+                });
+
+                // Bắt đầu countdown
+                this.startCountdown(interaction, newGame);
+                return;
+            }
+
             const channelId = interaction.channel.id;
             const game = games.get(channelId);
             
@@ -281,18 +366,75 @@ module.exports = {
 
             const amount = validation.amount;
 
-            // Lưu cược (chưa trừ tiền)
-            game.bets.set(interaction.user.id, {
-                type: betType,
-                amount: amount,
-                user: interaction.user
-            });
-            game.participants.add(interaction.user.id);
-
-            await interaction.reply({ 
-                content: `✅ Đã cược **${betType.toUpperCase()}** với **${amount.toLocaleString()} Rin**!\nTiền sẽ được trừ khi nhà cái bắt đầu quay.`, 
-                flags: 64 
-            });
+            // Lưu cược - Hỗ trợ cược cả 2 cửa
+            const userId = interaction.user.id;
+            
+            // Kiểm tra xem user đã có bet chưa
+            let existingBet = game.bets.get(userId);
+            
+            if (existingBet) {
+                // Nếu đã cược, kiểm tra xem có cược cùng cửa không
+                if (Array.isArray(existingBet)) {
+                    // Đã cược nhiều lần
+                    const sameBetType = existingBet.find(bet => bet.type === betType);
+                    if (sameBetType) {
+                        // Cộng thêm vào cửa đã cược
+                        sameBetType.amount += amount;
+                        await interaction.reply({ 
+                            content: `✅ Đã cộng thêm **${amount.toLocaleString()} Rin** vào cửa **${betType.toUpperCase()}**!\nTổng cược ${betType.toUpperCase()}: **${sameBetType.amount.toLocaleString()} Rin**`, 
+                            flags: 64 
+                        });
+                    } else {
+                        // Cược cửa mới
+                        existingBet.push({
+                            type: betType,
+                            amount: amount,
+                            user: interaction.user
+                        });
+                        await interaction.reply({ 
+                            content: `✅ Đã cược thêm **${betType.toUpperCase()}** với **${amount.toLocaleString()} Rin**!\nBạn đã cược cả 2 cửa. Tiền sẽ được trừ khi nhà cái bắt đầu quay.`, 
+                            flags: 64 
+                        });
+                    }
+                } else {
+                    // Chỉ có 1 bet, chuyển thành array
+                    if (existingBet.type === betType) {
+                        // Cùng cửa, cộng dồn
+                        existingBet.amount += amount;
+                        await interaction.reply({ 
+                            content: `✅ Đã cộng thêm **${amount.toLocaleString()} Rin** vào cửa **${betType.toUpperCase()}**!\nTổng cược ${betType.toUpperCase()}: **${existingBet.amount.toLocaleString()} Rin**`, 
+                            flags: 64 
+                        });
+                    } else {
+                        // Khác cửa, tạo array
+                        game.bets.set(userId, [
+                            existingBet,
+                            {
+                                type: betType,
+                                amount: amount,
+                                user: interaction.user
+                            }
+                        ]);
+                        await interaction.reply({ 
+                            content: `✅ Đã cược thêm **${betType.toUpperCase()}** với **${amount.toLocaleString()} Rin**!\nBạn đã cược cả 2 cửa. Tiền sẽ được trừ khi nhà cái bắt đầu quay.`, 
+                            flags: 64 
+                        });
+                    }
+                }
+            } else {
+                // Lần đầu cược
+                game.bets.set(userId, {
+                    type: betType,
+                    amount: amount,
+                    user: interaction.user
+                });
+                game.participants.add(userId);
+                
+                await interaction.reply({ 
+                    content: `✅ Đã cược **${betType.toUpperCase()}** với **${amount.toLocaleString()} Rin**!\nTiền sẽ được trừ khi nhà cái bắt đầu quay.`, 
+                    flags: 64 
+                });
+            }
 
             // Cập nhật embed chính
             await this.updateGameEmbed(interaction, game);
@@ -350,9 +492,17 @@ module.exports = {
             // Bắt đầu game
             game.started = true;
 
-            // Trừ tiền tất cả người cược
+            // Trừ tiền tất cả người cược - Hỗ trợ multi-bet
             for (const [userId, bet] of game.bets) {
-                await updateUserRin(userId, -bet.amount);
+                if (Array.isArray(bet)) {
+                    // Người này cược nhiều cửa
+                    for (const singleBet of bet) {
+                        await updateUserRin(userId, -singleBet.amount);
+                    }
+                } else {
+                    // Cược đơn
+                    await updateUserRin(userId, -bet.amount);
+                }
             }
 
             await interaction.deferUpdate();
@@ -367,10 +517,18 @@ module.exports = {
 
             let cancelMessage = '❌ Phiên Tài Xỉu đã bị hủy!';
 
-            // Chỉ hoàn tiền nếu đã bắt đầu (đã trừ tiền)
+            // Chỉ hoàn tiền nếu đã bắt đầu (đã trừ tiền) - Hỗ trợ multi-bet
             if (game.started) {
                 for (const [userId, bet] of game.bets) {
-                    await updateUserRin(userId, bet.amount);
+                    if (Array.isArray(bet)) {
+                        // Hoàn tiền cho multi-bet
+                        for (const singleBet of bet) {
+                            await updateUserRin(userId, singleBet.amount);
+                        }
+                    } else {
+                        // Hoàn tiền cho single bet
+                        await updateUserRin(userId, bet.amount);
+                    }
                 }
                 cancelMessage = '❌ Phiên Tài Xỉu đã bị hủy! Đã hoàn tiền cho tất cả người chơi.';
             } else {
@@ -426,15 +584,25 @@ module.exports = {
             await interaction.editReply({ embeds: [shakingEmbed] });
             await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // Tính bias dựa trên tổng tiền cược và xu hướng người chơi
+            // Tính bias dựa trên tổng tiền cược và xu hướng người chơi - Hỗ trợ multi-bet
             let totalBetAmount = 0;
             let taiPlayers = 0;
             let xiuPlayers = 0;
             
             for (const [userId, bet] of game.bets) {
-                totalBetAmount += bet.amount;
-                if (bet.type === 'tai') taiPlayers++;
-                else xiuPlayers++;
+                if (Array.isArray(bet)) {
+                    // Người này cược nhiều cửa
+                    for (const singleBet of bet) {
+                        totalBetAmount += singleBet.amount;
+                        if (singleBet.type === 'tai') taiPlayers++;
+                        else xiuPlayers++;
+                    }
+                } else {
+                    // Cược đơn
+                    totalBetAmount += bet.amount;
+                    if (bet.type === 'tai') taiPlayers++;
+                    else xiuPlayers++;
+                }
             }
 
             // RIGGED DICE LOGIC - Bias về nhà cái
@@ -538,14 +706,14 @@ module.exports = {
             }
 
             function getDiceEmoji(number) {
-                // Unicode dice emojis đẹp hơn
+                // Emoji xúc xắc thực tế
                 const diceEmojis = {
-                    1: '🔹',
-                    2: '🔸', 
-                    3: '🔶',
-                    4: '🔷',
-                    5: '🔴',
-                    6: '🟠'
+                    1: '⚀',
+                    2: '⚁', 
+                    3: '⚂',
+                    4: '⚃',
+                    5: '⚄',
+                    6: '⚅'
                 };
                 return diceEmojis[number] || '🎲';
             }
@@ -571,42 +739,67 @@ module.exports = {
             // Hiển thị xúc xắc đầu tiên
             const reveal1Embed = new EmbedBuilder()
                 .setTitle(`🎲 XÚC XẮC THỨ NHẤT - PHIÊN #${game.session.toString().padStart(4, '0')}`)
-                .setDescription(`🎯 **Xúc xắc đầu tiên ra kết quả:**\n\n` +
-                              `\`\`\`\n${getDiceVisual(dice1)}\n\`\`\`\n` +
-                              `${getDiceEmoji(dice1)} **Số ${dice1}** | ⚪ ⚪\n` +
-                              `⏳ Đang chờ 2 xúc xắc còn lại...`)
-                .setImage(dice1Url)
-                .setColor('#4ECDC4');
+                .setDescription(`🎯 **Xúc xắc đầu tiên đã dừng lại:**\n\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                              `🎲 **XÚC XẮC 1:**\n` +
+                              `${getDiceEmoji(dice1)} **SỐ ${dice1}**\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                              `⚪ **Xúc xắc 2:** Đang quay...\n` +
+                              `⚪ **Xúc xắc 3:** Đang quay...\n\n` +
+                              `⏳ **Còn 2 viên xúc xắc nữa!**`)
+                .addFields({
+                    name: '🎯 Kết quả hiện tại',
+                    value: `${getDiceEmoji(dice1)} **${dice1}** + ? + ? = ?`,
+                    inline: false
+                })
+                .setColor('#4ECDC4')
+                .setThumbnail('https://cdn.discordapp.com/emojis/🎲.png');
             
             await interaction.editReply({ embeds: [reveal1Embed] });
-            await new Promise(resolve => setTimeout(resolve, 1200));
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
             // Hiển thị xúc xắc thứ hai  
             const reveal2Embed = new EmbedBuilder()
                 .setTitle(`🎲 XÚC XẮC THỨ HAI - PHIÊN #${game.session.toString().padStart(4, '0')}`)
-                .setDescription(`🎯 **Hai xúc xắc đã ra:**\n\n` +
-                              `\`\`\`\n${getDiceVisual(dice2)}\n\`\`\`\n` +
-                              `${getDiceEmoji(dice1)} **${dice1}** | ${getDiceEmoji(dice2)} **${dice2}** | ⚪\n` +
-                              `⏳ Còn 1 xúc xắc quyết định cuối cùng...`)
-                .setImage(dice2Url)
-                .setColor('#45B7D1');
+                .setDescription(`🎯 **Xúc xắc thứ hai đã dừng lại:**\n\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                              `🎲 **XÚC XẮC 1:** ${getDiceEmoji(dice1)} **${dice1}**\n` +
+                              `🎲 **XÚC XẮC 2:** ${getDiceEmoji(dice2)} **${dice2}**\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                              `⚪ **Xúc xắc 3:** Đang quay...\n\n` +
+                              `⏳ **Còn 1 viên xúc xắc quyết định!**`)
+                .addFields({
+                    name: '🎯 Kết quả hiện tại',
+                    value: `${getDiceEmoji(dice1)} **${dice1}** + ${getDiceEmoji(dice2)} **${dice2}** + ? = **${dice1 + dice2} + ?**`,
+                    inline: false
+                })
+                .setColor('#45B7D1')
+                .setThumbnail('https://cdn.discordapp.com/emojis/🎲.png');
             
             await interaction.editReply({ embeds: [reveal2Embed] });
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            await new Promise(resolve => setTimeout(resolve, 1800));
 
             // Hiển thị xúc xắc cuối và kết quả drama
             const suspenseEmbed = new EmbedBuilder()
                 .setTitle(`🎲 XÚC XẮC CUỐI CÙNG - PHIÊN #${game.session.toString().padStart(4, '0')}`)
-                .setDescription(`🎯 **Xúc xắc cuối cùng quyết định:**\n\n` +
-                              `\`\`\`\n${getDiceVisual(dice3)}\n\`\`\`\n` +
-                              `${getDiceEmoji(dice1)} **${dice1}** | ${getDiceEmoji(dice2)} **${dice2}** | ${getDiceEmoji(dice3)} **${dice3}**\n\n` +
-                              `🔥 **TỔNG CỘNG: ${total} ĐIỂM**\n` +
-                              `⏳ Đang tính toán kết quả...`)
-                .setImage(dice3Url)
-                .setColor('#9B59B6');
+                .setDescription(`🎯 **Xúc xắc cuối cùng đã dừng lại:**\n\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                              `🎲 **XÚC XẮC 1:** ${getDiceEmoji(dice1)} **${dice1}**\n` +
+                              `🎲 **XÚC XẮC 2:** ${getDiceEmoji(dice2)} **${dice2}**\n` +
+                              `🎲 **XÚC XẮC 3:** ${getDiceEmoji(dice3)} **${dice3}**\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                              `🔥 **TỔNG CỘNG: ${total} ĐIỂM**\n\n` +
+                              `⏳ **Đang tính toán kết quả...**`)
+                .addFields({
+                    name: '🎯 Kết quả cuối cùng',
+                    value: `${getDiceEmoji(dice1)} **${dice1}** + ${getDiceEmoji(dice2)} **${dice2}** + ${getDiceEmoji(dice3)} **${dice3}** = **${total} ĐIỂM**`,
+                    inline: false
+                })
+                .setColor('#9B59B6')
+                .setThumbnail('https://cdn.discordapp.com/emojis/🎲.png');
             
             await interaction.editReply({ embeds: [suspenseEmbed] });
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // Log rigged info for admin (optional)
             if (riggedSettings.logRigged && riggedSettings.enabled) {
@@ -645,24 +838,56 @@ module.exports = {
                 console.error('Lỗi lưu history tài xỉu:', error);
             }
 
-            // Tính kết quả cho từng người chơi
+            // Tính kết quả cho từng người chơi - Hỗ trợ multi-bet
             let totalHostWinnings = 0;
             let resultText = '';
 
             for (const [userId, bet] of game.bets) {
-                const user = bet.user;
-                const isWin = bet.type === result;
-                
-                if (isWin) {
-                    // Thắng: Hoàn tiền + tiền thưởng (1:1)
-                    const winAmount = bet.amount * 2;
-                    await updateUserRin(userId, winAmount);
-                    totalHostWinnings -= bet.amount; // Nhà cái mất tiền
-                    resultText += `✅ **${user.displayName}**: Thắng +${bet.amount.toLocaleString()} Rin\n`;
+                if (Array.isArray(bet)) {
+                    // Người này cược nhiều cửa
+                    let userTotalWin = 0;
+                    let userTotalLoss = 0;
+                    let userResults = [];
+                    
+                    for (const singleBet of bet) {
+                        const isWin = singleBet.type === result;
+                        
+                        if (isWin) {
+                            // Thắng: Hoàn tiền + tiền thưởng (1:1)
+                            const winAmount = singleBet.amount * 2;
+                            await updateUserRin(userId, winAmount);
+                            totalHostWinnings -= singleBet.amount; // Nhà cái mất tiền
+                            userTotalWin += singleBet.amount;
+                            userResults.push(`✅ ${singleBet.type.toUpperCase()}: +${singleBet.amount.toLocaleString()}`);
+                        } else {
+                            // Thua: Nhà cái ăn tiền
+                            totalHostWinnings += singleBet.amount;
+                            userTotalLoss += singleBet.amount;
+                            userResults.push(`❌ ${singleBet.type.toUpperCase()}: -${singleBet.amount.toLocaleString()}`);
+                        }
+                    }
+                    
+                    const netResult = userTotalWin - userTotalLoss;
+                    const netIcon = netResult >= 0 ? '✅' : '❌';
+                    const netSign = netResult >= 0 ? '+' : '';
+                    
+                    resultText += `${netIcon} **${bet[0].user.displayName}**: ${userResults.join(', ')} | **Net: ${netSign}${netResult.toLocaleString()} Rin**\n`;
                 } else {
-                    // Thua: Nhà cái ăn tiền
-                    totalHostWinnings += bet.amount;
-                    resultText += `❌ **${user.displayName}**: Thua -${bet.amount.toLocaleString()} Rin\n`;
+                    // Cược đơn
+                    const user = bet.user;
+                    const isWin = bet.type === result;
+                    
+                    if (isWin) {
+                        // Thắng: Hoàn tiền + tiền thưởng (1:1)
+                        const winAmount = bet.amount * 2;
+                        await updateUserRin(userId, winAmount);
+                        totalHostWinnings -= bet.amount; // Nhà cái mất tiền
+                        resultText += `✅ **${user.displayName}**: Thắng ${bet.type.toUpperCase()} +${bet.amount.toLocaleString()} Rin\n`;
+                    } else {
+                        // Thua: Nhà cái ăn tiền
+                        totalHostWinnings += bet.amount;
+                        resultText += `❌ **${user.displayName}**: Thua ${bet.type.toUpperCase()} -${bet.amount.toLocaleString()} Rin\n`;
+                    }
                 }
             }
 
@@ -680,29 +905,39 @@ module.exports = {
 
             const dramaBuildupEmbed = new EmbedBuilder()
                 .setTitle(`🎯 CÔNG BỐ KẾT QUẢ - PHIÊN #${game.session.toString().padStart(4, '0')}`)
-                .setDescription(`**🎲 BA XÚC XẮC CUỐI CÙNG:**\n\n` +
-                              `🎲 **${dice1}** | 🎲 **${dice2}** | 🎲 **${dice3}**\n\n` +
-                              `🔥 **TỔNG CỘNG: ${total} ĐIỂM**\n\n` +
+                .setDescription(`🎲 **BA XÚC XẮC ĐÃ HOÀN THÀNH:**\n\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                              `🎲 **XÚC XẮC 1:** ${getDiceEmoji(dice1)} **${dice1}**\n` +
+                              `🎲 **XÚC XẮC 2:** ${getDiceEmoji(dice2)} **${dice2}**\n` +
+                              `🎲 **XÚC XẮC 3:** ${getDiceEmoji(dice3)} **${dice3}**\n` +
+                              `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                              `🧮 **TỔNG CỘNG: ${total} ĐIỂM**\n\n` +
                               `${total >= 11 ? '🔺' : '🔻'} **KẾT QUẢ: ${resultText_drama}**\n\n` +
-                              `💥 ${result === 'tai' ? 'TÀI THẮNG!' : 'XỈU THẮNG!'}`)
+                              `💥 ${result === 'tai' ? '🔥 TÀI THẮNG! 🔥' : '❄️ XỈU THẮNG! ❄️'}`)
                 .addFields(
-                    { name: '🎲 Xúc xắc 1', value: `**${dice1}**`, inline: true },
-                    { name: '🎲 Xúc xắc 2', value: `**${dice2}**`, inline: true },
-                    { name: '🎲 Xúc xắc 3', value: `**${dice3}**`, inline: true }
+                    { 
+                        name: '🎯 Chi tiết tính điểm', 
+                        value: `${getDiceEmoji(dice1)} **${dice1}** + ${getDiceEmoji(dice2)} **${dice2}** + ${getDiceEmoji(dice3)} **${dice3}** = **${total} ĐIỂM**`, 
+                        inline: false 
+                    }
                 )
-                .setImage(dice1Url) // Hiển thị xúc xắc đại diện
-                .setThumbnail(dice3Url) // Xúc xắc thứ 3 làm thumbnail
-                .setColor(resultColor);
+                .setColor(resultColor)
+                .setThumbnail('https://cdn.discordapp.com/emojis/🎲.png');
             
             await interaction.editReply({ embeds: [dramaBuildupEmbed] });
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 3000));
 
             // Bước 5: Hiển thị kết quả chi tiết
             const finalResultEmbed = new EmbedBuilder()
                 .setTitle(`🏆 BẢNG KẾT QUẢ PHIÊN #${game.session.toString().padStart(4, '0')}`)
                 .setDescription(
-                    `🎲 **KẾT QUẢ 3 XÚC XẮC:**\n` +
-                    `📊 **TỔNG ĐIỂM:** ${total} điểm\n` +
+                    `🎲 **CHI TIẾT 3 XÚC XẮC:**\n\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                    `🎲 **XÚC XẮC 1:** ${getDiceEmoji(dice1)} **${dice1}**\n` +
+                    `🎲 **XÚC XẮC 2:** ${getDiceEmoji(dice2)} **${dice2}**\n` +
+                    `🎲 **XÚC XẮC 3:** ${getDiceEmoji(dice3)} **${dice3}**\n` +
+                    `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                    `🧮 **TỔNG ĐIỂM:** ${total} điểm\n` +
                     `🏆 **KẾT QUẢ:** ${resultIcon} **${resultText_drama}**\n\n` +
                     `┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
                     `┃            **📊 CHI TIẾT NGƯỜI CHƠI**           ┃\n` +
@@ -712,20 +947,39 @@ module.exports = {
                     `🎯 **Cầu mới:** \`${createCauDisplay(globalHistory).cauString}\``
                 )
                 .addFields(
-                    { name: '🎲 Xúc xắc 1', value: `**${dice1}**`, inline: true },
-                    { name: '🎲 Xúc xắc 2', value: `**${dice2}**`, inline: true },
-                    { name: '🎲 Xúc xắc 3', value: `**${dice3}**`, inline: true }
+                    { 
+                        name: '🎲 Kết quả chi tiết', 
+                        value: `${getDiceEmoji(dice1)} **${dice1}** + ${getDiceEmoji(dice2)} **${dice2}** + ${getDiceEmoji(dice3)} **${dice3}** = **${total}**`, 
+                        inline: false 
+                    },
+                    {
+                        name: '🎯 Kết luận',
+                        value: `${result === 'tai' ? '🔥 **TÀI THẮNG**' : '❄️ **XỈU THẮNG**'} (${total >= 11 ? '≥11' : '≤10'} điểm)`,
+                        inline: false
+                    }
                 )
-                .setImage(dice2Url) // Hiển thị xúc xắc thứ 2 làm ảnh chính
-                .setThumbnail(dice1Url) // Xúc xắc thứ 1 làm thumbnail
                 .setColor(resultColor)
+                .setThumbnail('https://cdn.discordapp.com/emojis/🎲.png')
                 .setFooter({ 
                     text: `Phiên hoàn thành | Chơi tiếp với ,taixiu`, 
                     iconURL: game.host.displayAvatarURL() 
                 })
                 .setTimestamp();
 
-            await interaction.editReply({ embeds: [finalResultEmbed] });
+            // Thêm nút bắt đầu nhanh
+            const quickStartButton = new ButtonBuilder()
+                .setCustomId('taixiu_quick_start')
+                .setLabel('🎲 Bắt đầu phiên mới')
+                .setStyle(ButtonStyle.Success)
+                .setEmoji('🚀');
+
+            const quickStartRow = new ActionRowBuilder()
+                .addComponents(quickStartButton);
+
+            await interaction.editReply({ 
+                embeds: [finalResultEmbed], 
+                components: [quickStartRow] 
+            });
 
             // Xóa game
             games.delete(interaction.channel.id);
@@ -738,6 +992,69 @@ module.exports = {
                 embeds: [], 
                 components: [] 
             });
+        }
+    },
+
+    // Bắt đầu countdown cho phiên mới
+    async startCountdown(interaction, game) {
+        try {
+            const countdownStart = Date.now();
+            
+            // Countdown timer
+            const countdownInterval = setInterval(async () => {
+                try {
+                    const elapsed = Date.now() - countdownStart;
+                    const timeLeft = Math.max(0, Math.ceil((BETTING_TIME - elapsed) / 1000));
+                    
+                    if (timeLeft <= 0 || game.started) {
+                        clearInterval(countdownInterval);
+                        
+                        if (!game.started) {
+                            // Hết thời gian cược, tự động bắt đầu nếu có người cược
+                            if (game.bets.size > 0) {
+                                game.started = true;
+                                
+                                // Trừ tiền người cược
+                                for (const [userId, bet] of game.bets) {
+                                    if (Array.isArray(bet)) {
+                                        for (const singleBet of bet) {
+                                            await updateUserRin(userId, -singleBet.amount);
+                                        }
+                                    } else {
+                                        await updateUserRin(userId, -bet.amount);
+                                    }
+                                }
+                                
+                                await this.executeGame(interaction, game);
+                            } else {
+                                // Không có ai cược, hủy phiên
+                                games.delete(interaction.channel.id);
+                                
+                                const timeoutEmbed = new EmbedBuilder()
+                                    .setTitle('⏰ PHIÊN ĐÃ HẾT THỜI GIAN')
+                                    .setDescription('❌ Không có ai đặt cược, phiên đã bị hủy!')
+                                    .setColor('#FF0000');
+                                
+                                await interaction.editReply({ 
+                                    embeds: [timeoutEmbed], 
+                                    components: [] 
+                                });
+                            }
+                        }
+                        return;
+                    }
+                    
+                    // Cập nhật game embed với thời gian
+                    await this.updateGameEmbed(interaction, game);
+                    
+                } catch (error) {
+                    console.error('Lỗi countdown tài xỉu:', error);
+                    clearInterval(countdownInterval);
+                }
+            }, 5000); // Cập nhật mỗi 5 giây
+            
+        } catch (error) {
+            console.error('Lỗi startCountdown tài xỉu:', error);
         }
     }
 }; 
