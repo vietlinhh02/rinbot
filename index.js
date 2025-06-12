@@ -61,28 +61,27 @@ process.on('SIGTERM', () => {
 // Function cập nhật Bot Activity động
 const updateBotActivity = async () => {
     try {
-        const guildPrefixes = await getAllGuildPrefixes();
-        
-        // Đếm số server sử dụng prefix mặc định vs custom
-        const totalServers = client.guilds.cache.size;
-        const customPrefixCount = Object.keys(guildPrefixes || {}).length;
-        const defaultPrefixCount = totalServers - customPrefixCount;
-        
-        // Hiển thị thông tin prefix động
-        if (customPrefixCount > 0) {
-            client.user.setActivity(`RinBot | Default: ${config.prefix} | Custom: ${customPrefixCount}/${totalServers} servers | ,setprefix`, { 
-                type: 'PLAYING' 
+        // Kiểm tra nếu đang trong maintenance mode
+        if (global.maintenanceMode && global.maintenanceMode.enabled) {
+            client.user.setActivity('🔧 ĐANG BẢO TRÌ - Chỉ Owner', { 
+                type: 'WATCHING' 
             });
-        } else {
-            client.user.setActivity(`RinBot | Prefix: ${config.prefix} | ,setprefix để đổi`, { 
-                type: 'PLAYING' 
-            });
+            return;
         }
+
+        const totalServers = client.guilds.cache.size;
+        const totalUsers = client.users.cache.size;
+        
+        // Hiển thị số server và user
+        client.user.setActivity(`${totalServers} servers | ${totalUsers} users | ,rinhelp`, { 
+            type: 'WATCHING' 
+        });
+        
     } catch (error) {
         console.error('Lỗi cập nhật bot activity:', error);
         // Fallback về hiển thị cơ bản
         try {
-            client.user.setActivity(`RinBot | Prefix: ${config.prefix} | ,setprefix`, { 
+            client.user.setActivity(`RinBot | Prefix: ${config.prefix} | ,rinhelp`, { 
                 type: 'PLAYING' 
             });
         } catch (fallbackError) {
@@ -130,8 +129,13 @@ client.once('ready', () => {
     // Reset restart count khi bot start thành công
     restartCount = 0;
     
-    // Thiết lập hoạt động với prefix động
+    // Thiết lập hoạt động với activity động
     updateBotActivity();
+    
+    // Cập nhật activity mỗi 30 phút để đảm bảo số liệu chính xác
+    setInterval(() => {
+        updateBotActivity();
+    }, 30 * 60 * 1000); // 30 phút
     
     // Khởi động Reminder Scheduler
     try {
@@ -165,6 +169,32 @@ client.on('resume', () => {
 
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
+    
+    // Kiểm tra maintenance mode - chỉ cho phép owner sử dụng bot
+    if (global.maintenanceMode && global.maintenanceMode.enabled && !config.isOwner(message.author.id)) {
+        // Chỉ phản hồi nếu đang cố gọi lệnh (bắt đầu với prefix)
+        const guildPrefix = await getGuildPrefix(message.guild?.id).catch(() => config.prefix);
+        if (message.content.startsWith(guildPrefix)) {
+            const { EmbedBuilder } = require('discord.js');
+            const maintenanceEmbed = new EmbedBuilder()
+                .setTitle('🔧 BOT ĐANG BẢO TRÌ')
+                .setDescription(`**Xin lỗi! Bot hiện đang bảo trì.**\n\n` +
+                    `**📋 Thông tin:**\n` +
+                    `• **Lý do:** ${global.maintenanceMode.reason}\n` +
+                    `• **Thời gian bắt đầu:** ${global.maintenanceMode.startTime.toLocaleString('vi-VN')}\n\n` +
+                    `**⏳ Vui lòng chờ đợi...**\n` +
+                    `Bot sẽ hoạt động trở lại sau khi bảo trì xong!\n\n` +
+                    `**💡 Thông tin liên hệ:**\n` +
+                    `Liên hệ owner bot nếu cần hỗ trợ khẩn cấp.`)
+                .setColor('#FFA500')
+                .setThumbnail('https://cdn-icons-png.flaticon.com/512/2377/2377194.png')
+                .setFooter({ text: 'Cảm ơn bạn đã kiên nhẫn!' })
+                .setTimestamp();
+            
+            return message.reply({ embeds: [maintenanceEmbed] });
+        }
+        return; // Không xử lý gì khác nếu đang maintenance
+    }
     
     // Xử lý DM từ chuyên gia
     if (!message.guild) {

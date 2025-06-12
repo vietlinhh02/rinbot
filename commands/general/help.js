@@ -476,7 +476,7 @@ module.exports = {
                         name: '⚙️ Hệ thống', 
                         value: `• \`${prefix}setprefix !\` - Đổi prefix server\n` +
                                `• \`${prefix}announce\` - Thông báo quan trọng\n` +
-                               `• \`${prefix}maintenance\` - Bật/tắt bảo trì\n` +
+                               `• \`${prefix}maintenance on/off\` - Bật/tắt bảo trì (Owner only)\n` +
                                `• \`${prefix}version\` - Kiểm tra phiên bản bot`, 
                         inline: false 
                     },
@@ -486,8 +486,10 @@ module.exports = {
                                `• \`${prefix}update\` - Cập nhật bot tự động 🔒\n` +
                                `• \`${prefix}update force\` - Cập nhật bắt buộc 🔒\n` +
                                `• \`${prefix}update backup\` - Backup dữ liệu 🔒\n` +
-                               `• \`${prefix}update status\` - Trạng thái bot 🔒\n\n` +
-                               `⚠️ **Lưu ý:** Chỉ chủ sở hữu bot mới có thể dùng!`, 
+                               `• \`${prefix}update status\` - Trạng thái bot 🔒\n` +
+                               `• \`${prefix}maintenance on/off\` - Bảo trì bot 🔒\n\n` +
+                               `⚠️ **Lưu ý:** Chỉ chủ sở hữu bot mới có thể dùng!\n` +
+                               `🔧 **Maintenance:** Khi bật, chỉ owner được dùng bot`, 
                         inline: false 
                     }
                 )
