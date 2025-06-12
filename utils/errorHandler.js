@@ -3,7 +3,7 @@ const { EmbedBuilder } = require('discord.js');
 class ErrorHandler {
     constructor(client) {
         this.client = client;
-        this.ownerId = process.env.OWNER_ID; // ID của owner
+        this.ownerId = process.env.DISCORD_OWNER_ID; // ID của owner
         this.errorQueue = [];
         this.isProcessing = false;
         this.lastErrorTime = new Map(); // Track để tránh spam
