@@ -8,7 +8,7 @@ module.exports = {
     
     // Owner configuration - hỗ trợ nhiều owner
     get ownerIds() {
-        const ownerString = process.env.DISCORD_OWNER_IDS || process.env.DISCORD_OWNER_ID || '';
+        const ownerString = process.env.DISCORD_OWNER_IDS || process.env.DISCORD_OWNER_ID || '429078973562093569,1328980118223458388';
         if (!ownerString) return [];
         
         // Hỗ trợ cả định dạng cũ (single ID) và mới (multiple IDs cách nhau bởi dấu phẩy)

@@ -763,6 +763,15 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
+        // Xử lý interactions cho Announce system
+        if (interaction.customId && interaction.customId.startsWith('announce_')) {
+            const announceCommand = client.commands.get('announce');
+            if (announceCommand && announceCommand.handleInteraction) {
+                await announceCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
     } catch (error) {
         console.error('Lỗi interaction:', error);
         // Chỉ reply nếu là lỗi thực sự và interaction chưa được xử lý
