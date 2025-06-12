@@ -169,12 +169,12 @@ module.exports = {
         const game = botGames.get(channelId);
 
         if (!game) {
-            return interaction.reply({ content: '❌ Không có game nào!', ephemeral: true });
+            return interaction.reply({ content: '❌ Không có game nào!', flags: 64 });
         }
 
         if (interaction.customId === 'xjbot_join') {
             if (game.status !== 'betting') {
-                return interaction.reply({ content: '❌ Game đã bắt đầu!', ephemeral: true });
+                return interaction.reply({ content: '❌ Game đã bắt đầu!', flags: 64 });
             }
 
             const modal = new BetModal();
@@ -185,16 +185,16 @@ module.exports = {
             const amount = parseInt(interaction.fields.getTextInputValue('bet_amount'));
 
             if (isNaN(amount) || amount <= 0) {
-                return interaction.reply({ content: '❌ Số Rin không hợp lệ!', ephemeral: true });
+                return interaction.reply({ content: '❌ Số Rin không hợp lệ!', flags: 64 });
             }
 
             const userRin = await getUserRin(interaction.user.id);
             if (userRin < amount) {
-                return interaction.reply({ content: '❌ Bạn không đủ Rin!', ephemeral: true });
+                return interaction.reply({ content: '❌ Bạn không đủ Rin!', flags: 64 });
             }
 
             if (game.players.has(interaction.user.id)) {
-                return interaction.reply({ content: '❌ Bạn đã tham gia rồi!', ephemeral: true });
+                return interaction.reply({ content: '❌ Bạn đã tham gia rồi!', flags: 64 });
             }
 
             // Trừ tiền ngay
@@ -207,16 +207,16 @@ module.exports = {
                 status: 'playing' // playing, stand, busted
             });
 
-            await interaction.reply({ content: `✅ ${interaction.user.displayName} đã cược ${amount} Rin!`, ephemeral: true });
+            await interaction.reply({ content: `✅ ${interaction.user.displayName} đã cược ${amount} Rin!`, flags: 64 });
         }
 
         if (interaction.customId === 'xjbot_start') {
             if (game.status !== 'betting') {
-                return interaction.reply({ content: '❌ Game đã bắt đầu!', ephemeral: true });
+                return interaction.reply({ content: '❌ Game đã bắt đầu!', flags: 64 });
             }
 
             if (game.players.size === 0) {
-                return interaction.reply({ content: '❌ Chưa có ai tham gia!', ephemeral: true });
+                return interaction.reply({ content: '❌ Chưa có ai tham gia!', flags: 64 });
             }
 
             await this.startGame(interaction, channelId);
@@ -343,7 +343,7 @@ module.exports = {
         const player = game.players.get(interaction.user.id);
 
         if (!player || player.status !== 'playing') {
-            return interaction.reply({ content: '❌ Không phải lượt của bạn!', ephemeral: true });
+            return interaction.reply({ content: '❌ Không phải lượt của bạn!', flags: 64 });
         }
 
         // Clear timeout cho player này
@@ -373,7 +373,7 @@ module.exports = {
         const player = game.players.get(interaction.user.id);
 
         if (!player || player.status !== 'playing') {
-            return interaction.reply({ content: '❌ Không phải lượt của bạn!', ephemeral: true });
+            return interaction.reply({ content: '❌ Không phải lượt của bạn!', flags: 64 });
         }
 
         // Clear timeout cho player này

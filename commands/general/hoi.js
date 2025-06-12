@@ -142,7 +142,7 @@ module.exports = {
                     .setColor('#00FF00')
                     .setFooter({ text: 'Hệ thống tư vấn ẩn danh' });
 
-                await interaction.reply({ embeds: [confirmEmbed], ephemeral: true });
+                await interaction.reply({ embeds: [confirmEmbed], flags: 64 });
 
                 // Tìm và gửi cho chuyên gia
                 await this.assignToExpert(interaction.client, consultation, category);
@@ -188,7 +188,7 @@ module.exports = {
                     .setDescription('Không thể gửi câu hỏi. Vui lòng thử lại sau!')
                     .setColor('#FF0000');
 
-                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+                await interaction.reply({ embeds: [errorEmbed], flags: 64 });
             }
         }
     },
@@ -333,14 +333,14 @@ module.exports = {
             if (!expert) {
                 return await interaction.reply({ 
                     content: '❌ Bạn không phải là chuyên gia trong hệ thống!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
             if (expert.status !== 'active') {
                 return await interaction.reply({ 
                     content: '❌ Tài khoản chuyên gia của bạn đang bị vô hiệu hóa!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -353,14 +353,14 @@ module.exports = {
             if (!consultation) {
                 return await interaction.reply({ 
                     content: '❌ Không tìm thấy câu hỏi này! Có thể đã bị xóa.', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
             if (consultation.status !== 'published') {
                 return await interaction.reply({ 
                     content: `❌ Câu hỏi này đã được trả lời hoặc không còn khả dụng (status: ${consultation.status})!`, 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -388,7 +388,7 @@ module.exports = {
                 console.error('Lỗi hiển thị modal:', modalError);
                 await interaction.reply({ 
                     content: `❌ Không thể hiển thị form trả lời: ${modalError.message}`, 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -398,7 +398,7 @@ module.exports = {
                 if (!interaction.replied) {
                     await interaction.reply({ 
                         content: `❌ Có lỗi xảy ra: ${error.message}`, 
-                        ephemeral: true 
+                        flags: 64 
                     });
                 }
             } catch (replyError) {
@@ -417,7 +417,7 @@ module.exports = {
                 console.error('Interaction không phải modal submit');
                 return await interaction.reply({ 
                     content: '❌ Có lỗi xảy ra: Không phải modal submit', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
@@ -430,7 +430,7 @@ module.exports = {
                 console.error('Không tìm thấy fields trong modal submit');
                 return await interaction.reply({ 
                     content: '❌ Có lỗi xảy ra: Không tìm thấy nội dung câu trả lời', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
@@ -443,14 +443,14 @@ module.exports = {
                 console.error('Lỗi khi lấy câu trả lời:', fieldError);
                 return await interaction.reply({ 
                     content: '❌ Không thể đọc nội dung câu trả lời. Vui lòng thử lại!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
             if (!answer || answer.trim().length < 10) {
                 return await interaction.reply({ 
                     content: '❌ Câu trả lời quá ngắn! Vui lòng viết chi tiết hơn.', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -464,7 +464,7 @@ module.exports = {
                 console.log('Không tìm thấy chuyên gia với ID:', interaction.user.id);
                 return await interaction.reply({ 
                     content: '❌ Bạn không phải là chuyên gia trong hệ thống!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
@@ -472,7 +472,7 @@ module.exports = {
                 console.log('Chuyên gia không active:', expert.status);
                 return await interaction.reply({ 
                     content: '❌ Tài khoản chuyên gia của bạn đang bị vô hiệu hóa!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -486,7 +486,7 @@ module.exports = {
                 console.log('Không tìm thấy consultation với shortId:', shortId);
                 return await interaction.reply({ 
                     content: '❌ Không tìm thấy câu hỏi này! Có thể đã bị xóa.', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
             
@@ -494,7 +494,7 @@ module.exports = {
                 console.log('Consultation không ở trạng thái published:', consultation.status);
                 return await interaction.reply({ 
                     content: `❌ Câu hỏi này đã được trả lời hoặc không còn khả dụng (status: ${consultation.status})!`, 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -514,7 +514,7 @@ module.exports = {
                 console.error('Thiếu publicChannelId hoặc publicMessageId');
                 return await interaction.reply({ 
                     content: '✅ Đã lưu câu trả lời thành công, nhưng không thể cập nhật tin nhắn công khai!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
             }
 
@@ -562,7 +562,7 @@ module.exports = {
                 console.error('Lỗi cập nhật tin nhắn công khai:', messageError);
                 await interaction.reply({ 
                     content: '✅ Đã lưu câu trả lời thành công, nhưng không thể cập nhật tin nhắn công khai!', 
-                    ephemeral: true 
+                    flags: 64 
                 });
                 return;
             }
@@ -598,7 +598,7 @@ module.exports = {
             console.log('Hoàn tất xử lý câu trả lời');
             await interaction.reply({ 
                 content: '✅ Đã gửi câu trả lời thành công! Câu trả lời đã được đăng công khai.', 
-                ephemeral: true 
+                flags: 64 
             });
 
         } catch (error) {
@@ -607,7 +607,7 @@ module.exports = {
                 if (!interaction.replied) {
                     await interaction.reply({ 
                         content: `❌ Có lỗi xảy ra khi gửi câu trả lời: ${error.message}`, 
-                        ephemeral: true 
+                        flags: 64 
                     });
                 }
             } catch (replyError) {

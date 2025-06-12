@@ -3,7 +3,9 @@ const { EmbedBuilder } = require('discord.js');
 class ErrorHandler {
     constructor(client) {
         this.client = client;
-        this.ownerId = process.env.DISCORD_OWNER_ID; // ID của owner
+        // Hỗ trợ nhiều owner ID từ config
+        const config = require('../config/config');
+        this.ownerIds = config.ownerIds || [];
         this.errorQueue = [];
         this.isProcessing = false;
         this.lastErrorTime = new Map(); // Track để tránh spam
@@ -66,7 +68,7 @@ class ErrorHandler {
     }
 
     async sendErrorToOwner(type, error) {
-        if (!this.client || !this.ownerId) return;
+        if (!this.client || !this.ownerIds || this.ownerIds.length === 0) return;
 
         try {
             // Rate limiting - chỉ gửi 1 lỗi tương tự mỗi 5 phút
@@ -79,9 +81,6 @@ class ErrorHandler {
             }
             
             this.lastErrorTime.set(errorHash, now);
-
-            const owner = await this.client.users.fetch(this.ownerId);
-            if (!owner) return;
 
             const errorString = error instanceof Error ? error.stack || error.message : String(error);
             
@@ -102,8 +101,23 @@ class ErrorHandler {
                 )
                 .setFooter({ text: 'RinBot Error Reporter' });
 
-            await owner.send({ embeds: [embed] });
-            console.log(`✅ Đã gửi lỗi cho owner: ${type}`);
+            // Gửi cho tất cả owner
+            let sentCount = 0;
+            for (const ownerId of this.ownerIds) {
+                try {
+                    const owner = await this.client.users.fetch(ownerId);
+                    if (owner) {
+                        await owner.send({ embeds: [embed] });
+                        sentCount++;
+                    }
+                } catch (ownerError) {
+                    console.error(`Không thể gửi lỗi cho owner ${ownerId}:`, ownerError.message);
+                }
+            }
+
+            if (sentCount > 0) {
+                console.log(`✅ Đã gửi lỗi cho ${sentCount}/${this.ownerIds.length} owner(s): ${type}`);
+            }
 
         } catch (sendError) {
             console.error('Không thể gửi lỗi cho owner:', sendError);
