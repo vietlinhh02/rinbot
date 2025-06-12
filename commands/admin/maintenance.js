@@ -1,7 +1,8 @@
 const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const config = require('../../config/config');
+const MaintenanceMode = require('../../models/MaintenanceMode');
 
-// Global maintenance state
+// Global maintenance state (sẽ được load từ database)
 global.maintenanceMode = {
     enabled: false,
     reason: null,
@@ -12,6 +13,27 @@ global.maintenanceMode = {
 module.exports = {
     name: 'maintenance',
     description: 'Bật/tắt chế độ bảo trì bot (chỉ owner)',
+    
+    // Function để load maintenance state từ database khi bot khởi động
+    async loadMaintenanceState() {
+        try {
+            const maintenanceData = await MaintenanceMode.findById('maintenance_state');
+            if (maintenanceData) {
+                global.maintenanceMode = {
+                    enabled: maintenanceData.enabled,
+                    reason: maintenanceData.reason,
+                    startTime: maintenanceData.startTime,
+                    enabledBy: maintenanceData.enabledBy
+                };
+                
+                if (global.maintenanceMode.enabled) {
+                    console.log(`🔧 [MAINTENANCE] Đã load trạng thái bảo trì từ database - Lý do: ${global.maintenanceMode.reason}`);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Lỗi load maintenance state từ database:', error);
+        }
+    },
     
     async execute(message, args) {
         // Kiểm tra quyền owner
@@ -52,25 +74,39 @@ module.exports = {
         }
 
         const reason = reasonArgs.join(' ') || 'Bảo trì hệ thống';
-        
-        global.maintenanceMode = {
+        const maintenanceData = {
             enabled: true,
             reason: reason,
             startTime: new Date(),
             enabledBy: message.author.id
         };
+        
+        // Lưu vào database
+        try {
+            await MaintenanceMode.findOneAndUpdate(
+                { _id: 'maintenance_state' },
+                maintenanceData,
+                { upsert: true, new: true }
+            );
+        } catch (error) {
+            console.error('Lỗi lưu maintenance state:', error);
+            return message.reply('❌ Không thể lưu trạng thái maintenance vào database!');
+        }
+
+        // Cập nhật global state
+        global.maintenanceMode = maintenanceData;
 
         // Cập nhật activity bot
         try {
             await message.client.user.setActivity('🔧 ĐANG BẢO TRÌ - Chỉ Owner', { 
-                type: 'WATCHING' 
+                type: 'LISTENING' 
             });
         } catch (error) {
             console.error('Lỗi cập nhật activity:', error);
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('🔧 CHẤU ĐỘ BẢO TRÌ ĐÃ BẬT')
+            .setTitle('🔧 CHẾ ĐỘ BẢO TRÌ ĐÃ BẬT')
             .setDescription(`**Bot hiện đang trong chế độ bảo trì!**\n\n` +
                 `**📋 Thông tin:**\n` +
                 `• **Lý do:** ${reason}\n` +
@@ -79,7 +115,8 @@ module.exports = {
                 `**⚠️ Tác động:**\n` +
                 `• Chỉ owner bot có thể dùng lệnh\n` +
                 `• Tất cả user khác sẽ nhận thông báo bảo trì\n` +
-                `• Activity bot hiển thị trạng thái bảo trì\n\n` +
+                `• Activity bot hiển thị trạng thái bảo trì\n` +
+                `• 💾 Trạng thái được lưu vào database (persistent)\n\n` +
                 `**🔧 Để tắt:** \`,maintenance off\``)
             .setColor('#FFA500')
             .setThumbnail('https://cdn-icons-png.flaticon.com/512/2377/2377194.png')
@@ -99,12 +136,27 @@ module.exports = {
         const duration = Date.now() - global.maintenanceMode.startTime;
         const durationText = this.formatDuration(duration);
 
-        global.maintenanceMode = {
+        const maintenanceData = {
             enabled: false,
             reason: null,
             startTime: null,
             enabledBy: null
         };
+
+        // Lưu vào database
+        try {
+            await MaintenanceMode.findOneAndUpdate(
+                { _id: 'maintenance_state' },
+                maintenanceData,
+                { upsert: true, new: true }
+            );
+        } catch (error) {
+            console.error('Lỗi lưu maintenance state:', error);
+            return message.reply('❌ Không thể lưu trạng thái maintenance vào database!');
+        }
+
+        // Cập nhật global state
+        global.maintenanceMode = maintenanceData;
 
         // Cập nhật lại activity bot bình thường
         try {
@@ -116,7 +168,7 @@ module.exports = {
         }
 
         const embed = new EmbedBuilder()
-            .setTitle('✅ CHẤU ĐỘ BẢO TRÌ ĐÃ TẮT')
+            .setTitle('✅ CHẾ ĐỘ BẢO TRÌ ĐÃ TẮT')
             .setDescription(`**Bot đã trở lại hoạt động bình thường!**\n\n` +
                 `**📊 Thống kê bảo trì:**\n` +
                 `• **Thời gian bảo trì:** ${durationText}\n` +
@@ -193,7 +245,8 @@ module.exports = {
                     name: '⚠️ Lưu ý',
                     value: '• Chỉ owner bot có thể dùng\n' +
                            '• Khi bật, chỉ owner được dùng bot\n' +
-                           '• Activity bot sẽ hiển thị trạng thái bảo trì',
+                           '• Activity bot sẽ hiển thị trạng thái bảo trì\n' +
+                           '• 💾 Trạng thái persistent qua restart bot',
                     inline: false
                 }
             )

@@ -68,7 +68,7 @@ const updateBotActivity = async () => {
         // Kiểm tra nếu đang trong maintenance mode
         if (global.maintenanceMode && global.maintenanceMode.enabled) {
             client.user.setActivity('🔧 ĐANG BẢO TRÌ - Chỉ Owner', { 
-                type: 'WATCHING' 
+                type: 'LISTENING' 
             });
             return;
         }
@@ -78,7 +78,7 @@ const updateBotActivity = async () => {
         
         // Hiển thị số server và user
         client.user.setActivity(`${totalServers} servers | ${totalUsers} users | ,rinhelp`, { 
-            type: 'WATCHING' 
+            type: 'LISTENING' 
         });
         
     } catch (error) {
@@ -140,6 +140,17 @@ client.once('ready', async () => {
 
     // Marriage Tracker không cần khởi tạo - chỉ cần import functions
     console.log('✅ Marriage Tracker functions loaded');
+
+    // Load maintenance state từ database
+    try {
+        const maintenanceCommand = client.commands.get('maintenance');
+        if (maintenanceCommand && maintenanceCommand.loadMaintenanceState) {
+            await maintenanceCommand.loadMaintenanceState();
+            console.log('✅ Maintenance state loaded from database');
+        }
+    } catch (error) {
+        console.error('❌ Lỗi load maintenance state:', error);
+    }
 
     // Bắt đầu cập nhật bot activity
     updateBotActivity();
