@@ -315,10 +315,12 @@ module.exports = {
                     return interaction.reply({ content: '❌ Bạn đã có nhiệm vụ rồi!', ephemeral: true });
                 }
 
-                // Nhận nhiệm vụ - dùng dot notation cho nested object
+                // Nhận nhiệm vụ - sử dụng object thay vì dot notation
                 const updateData = {
-                    'currentMission.type': missionType,
-                    'currentMission.startTime': new Date()
+                    currentMission: {
+                        type: missionType,
+                        startTime: new Date()
+                    }
                 };
                 
                 console.log(`🎯 [NHIEMVU] Updating user with data:`, updateData);
@@ -391,8 +393,7 @@ module.exports = {
     getHouseName(houseType) {
         const houseNames = {
             'nhatro': 'Nhà Trọ',
-            'nhatuong': 'Nhà Thường',
-            'bietlau': 'Biệt Lầu',
+            'nhalau': 'Nhà Lầu',
             'bietthu': 'Biệt Thự'
         };
         return houseNames[houseType] || 'Không rõ';
@@ -401,8 +402,7 @@ module.exports = {
     getHouseBonus(houseType) {
         const bonuses = {
             'nhatro': 0,      // 0% bonus
-            'nhatuong': 0.1,  // 10% bonus
-            'bietlau': 0.25,  // 25% bonus 
+            'nhalau': 0.25,   // 25% bonus 
             'bietthu': 0.5    // 50% bonus
         };
         return bonuses[houseType] || 0;

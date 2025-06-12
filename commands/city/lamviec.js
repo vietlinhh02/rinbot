@@ -127,9 +127,10 @@ module.exports = {
                     `• **Giới hạn:** Mỗi nhà chỉ trộm được 1 lần/ngày\n` +
                     `• **Thu nhập:** 100-500 Rin ngẫu nhiên\n\n` +
                     `🌱 **TRỘM CÂY TRONG FARM:**\n` +
-                    `• **Điều kiện:** Cây đã trưởng thành và có thể thu hoạch (KHÔNG cần nhà)\n` +
-                    `• **Thời gian:** Từ khi cây có thể thu hoạch đến 3 tiếng (chưa chết)\n` +
-                    `• **Thu nhập:** 30-70% giá trị cây\n` +
+                    `• **Điều kiện:** Cây đã trồng ít nhất 10 phút\n` +
+                    `• **Cây chưa trưởng thành:** Tỉ lệ thành công 40%, giá trị 50%\n` +
+                    `• **Cây đã trưởng thành:** Tỉ lệ thành công 90%, giá trị 80%\n` +
+                    `• **Thu nhập:** 30-70% giá trị cây (đã điều chỉnh theo trạng thái)\n` +
                     `• **Rủi ro:** Có thể bị công an bắt trong 10 phút\n\n` +
                     `**⚠️ LƯU Ý QUAN TRỌNG:**\n` +
                     `• **Cooldown đặc biệt:** 2 phút/lần trộm\n` +
@@ -174,11 +175,12 @@ module.exports = {
         const embed = new EmbedBuilder()
             .setTitle('🎯 DANH SÁCH MỤC TIÊU TRỘM')
             .setDescription(`**Danh sách những người có thể trộm:**\n\n` +
-                `🌱 **Trộm cây:** Cây đã trưởng thành và có thể thu hoạch (KHÔNG cần nhà)\n` +
+                `🌱 **Trộm cây:** Cây đã trồng ít nhất 10 phút (KHÔNG cần nhà)\n` +
                 `🏠 **Trộm tiền:** ${canStealMoney ? '✅ Hiện tại có thể (19h-21h, CẦN có nhà)' : '❌ Ngoài giờ (19h-21h, CẦN có nhà)'}\n\n` +
                 `⏰ **Cooldown:** 2 phút/lần trộm\n` +
                 `⚠️ **Nguy cơ:** Có thể bị công an bắt\n` +
-                `📅 **Trộm tiền:** Mỗi nhà chỉ 1 lần/ngày\n\n` +
+                `📅 **Trộm tiền:** Mỗi nhà chỉ 1 lần/ngày\n` +
+                `🎯 **Trộm cây:** Chưa trưởng thành 40% thành công, đã trưởng thành 90% thành công\n\n` +
                 `*Sử dụng:* \`,lamviec @user\` để trộm`)
             .setColor(COLORS.info);
 
@@ -208,11 +210,19 @@ module.exports = {
                 guildId: message.guild.id // Chỉ tìm cây trong server hiện tại
             });
             const stealableTrees = targetTrees.filter(tree => {
-                if (!tree.maturedAt) return false; // Cây phải đã trưởng thành
-                const matured = new Date(tree.maturedAt);
-                const minutesSinceMature = (new Date() - matured) / (1000 * 60);
-                if (minutesSinceMature < 60) return false; // Phải chờ ít nhất 1 tiếng sau khi mature (có thể thu hoạch)
-                if (minutesSinceMature > 180) return false; // Đã chết sau 3 tiếng
+                // Có thể trộm tất cả cây (kể cả chưa thu hoạch)
+                const now = new Date();
+                const minutesSincePlant = (now - new Date(tree.plantedAt)) / (1000 * 60);
+                
+                // Chỉ trộm được cây đã trồng ít nhất 10 phút
+                if (minutesSincePlant < 10) return false;
+                
+                // Nếu cây đã chết thì không trộm được
+                if (tree.maturedAt) {
+                    const deadMinutes = (now - new Date(tree.maturedAt)) / (1000 * 60);
+                    if (deadMinutes >= 180) return false; // Cây chết sau 3 tiếng
+                }
+                
                 return true;
             });
 
@@ -263,11 +273,29 @@ module.exports = {
                 stealType = 'tree';
                 const randomTree = stealableTrees[Math.floor(Math.random() * stealableTrees.length)];
                 const treeValue = TREE_VALUES[randomTree.species] || 100;
-                stolenAmount = Math.floor(treeValue * (0.3 + Math.random() * 0.4)); // 30-70% giá trị
-                description = `cây ${randomTree.species} từ farm ${targetUser.displayName}`;
+                
+                // Tính tỉ lệ thành công dựa trên trạng thái cây
+                let treePenalty = 1; // Mặc định không giảm giá trị
+                let successBonus = 0; // Bonus tỉ lệ thành công
+                
+                if (randomTree.maturedAt) {
+                    // Cây đã trưởng thành - dễ trộm hơn
+                    successBonus = 0.2; // +20% cơ hội thành công
+                    treePenalty = 0.8; // Giá trị 80% (cây đã lão hóa)
+                } else {
+                    // Cây chưa trưởng thành - khó trộm hơn
+                    successBonus = -0.3; // -30% cơ hội thành công (40% thay vì 70%)
+                    treePenalty = 0.5; // Giá trị chỉ 50% (cây non)
+                }
+                
+                stolenAmount = Math.floor(treeValue * treePenalty * (0.3 + Math.random() * 0.4)); // 30-70% giá trị đã điều chỉnh
+                description = `cây ${randomTree.species} ${randomTree.maturedAt ? '(đã trưởng thành)' : '(chưa trưởng thành)'} từ farm ${targetUser.displayName}`;
 
                 // Xóa cây khỏi farm
                 await Tree.deleteOne({ _id: randomTree._id });
+                
+                // Điều chỉnh tỉ lệ thành công
+                successRate = Math.max(0.1, Math.min(0.9, 0.7 + successBonus)); // Giới hạn 10%-90%
             }
 
             // Thông báo cho channel về việc trộm
@@ -473,10 +501,12 @@ module.exports = {
         const job = JOB_TYPES[cityUser.job];
         const now = new Date();
         const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
-        const canWork = !lastWork || (now - lastWork) >= job.cooldown;
+        
+        // Nếu cooldown = 0 thì luôn có thể làm việc
+        const canWork = job.cooldown === 0 || !lastWork || (now - lastWork) >= job.cooldown;
         
         let cooldownInfo = '';
-        if (!canWork) {
+        if (!canWork && job.cooldown > 0) {
             const timeLeft = job.cooldown - (now - lastWork);
             const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
             const hoursLeft = Math.floor(minutesLeft / 60);
@@ -515,7 +545,7 @@ module.exports = {
                 `• Thành công = nhận thưởng + trộm mất tiền\n\n` +
                 `**⏰ Thời gian:**\n` +
                 `• **Cơ hội bắt:** ${job.catchWindow / (60 * 1000)} phút từ lúc trộm\n` +
-                `• **Cooldown tuần tra:** ${this.formatCooldown(job.cooldown)}\n\n` +
+                `• **Cooldown tuần tra:** ${job.cooldown === 0 ? 'KHÔNG CÓ - BẮT LIÊN TỤC!' : this.formatCooldown(job.cooldown)}\n\n` +
                 `${canWork ? (activeThefts > 0 ? '🚨 **Có trộm đang hoạt động! Hãy bắt ngay!**' : '👮 **Đang tuần tra, sẵn sàng bắt trộm!**') : '⏰ **Đang nghỉ, chờ cooldown!**'}`)
             .setColor(canWork ? (activeThefts > 0 ? COLORS.error : COLORS.info) : COLORS.warning)
             .setThumbnail(JOB_IMAGES.congan);
@@ -534,10 +564,10 @@ module.exports = {
             footerText = `Cooldown còn ${timeString}`;
         }
         
-        embed.setFooter({ text: `${footerText} | Có thể làm liên tục!` });
+        embed.setFooter({ text: `${footerText} | ${job.cooldown === 0 ? 'BẮT LIÊN TỤC!' : 'Có thể làm liên tục!'}` });
 
-        // Chỉ cập nhật lastWork khi có thể làm việc
-        if (canWork) {
+        // Chỉ cập nhật lastWork khi có cooldown và có thể làm việc
+        if (canWork && job.cooldown > 0) {
             await updateCityUser(message.author.id, { lastWork: new Date() });
         }
         

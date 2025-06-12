@@ -206,24 +206,28 @@ module.exports = {
                                `• \`${prefix}thuenha\` - Thuê nhà (500-8000 Rin)\n` +
                                `• \`${prefix}huynha\` - **MỚI!** Hủy thuê nhà (hoàn 50% tiền)\n` +
                                `• \`${prefix}suanha\` - Sửa nhà mỗi 5 ngày\n` +
-                               `• **4 loại:** Nhà trọ (500) → Nhà thường (2000) → Nhà lầu (5000) → Biệt thự (8000)`, 
+                               `• **3 loại:** Nhà trọ (500) → Nhà lầu (5000) → Biệt thự (8000)\n` +
+                               `• **Đã bỏ:** Nhà tường để đơn giản hóa hệ thống`, 
                         inline: false 
                     },
                     { 
                         name: '💼 Nghề nghiệp', 
                         value: `• \`${prefix}dangkynghe\` - Đăng ký nghề nghiệp\n` +
                                `• \`${prefix}lamviec\` - Làm việc theo nghề\n` +
+                               `• \`${prefix}battrom @user\` - Lệnh đặc biệt cho công an\n` +
                                `• **Trộm:** Trộm cây + tiền 19-21h (nhà trọ, cooldown 2 phút)\n` +
-                               `• **Nhà báo:** Chat 50 tin nhắn (nhà thường+, cooldown 4h)\n` +
-                               `• **MC:** Ngồi voice 15 phút (nhà thường+, cooldown 4h)\n` +
-                               `• **Công an:** Bắt trộm, giải đố (biệt thự, cooldown 1h)`, 
+                               `• **Nhà báo:** Chat 50 tin nhắn (nhà lầu+, cooldown 4h)\n` +
+                               `• **MC:** Ngồi voice 15 phút (nhà lầu+, cooldown 4h)\n` +
+                               `• **Công an:** Bắt trộm, giải đố (biệt thự, **KHÔNG COOLDOWN**)`, 
                         inline: false 
                     },
                     { 
                         name: '🎯 Tính năng đặc biệt', 
                         value: `• **Trộm tiền:** 19-21h, 100-500 Rin/lần, 1 lần/nhà/ngày\n` +
-                               `• **Trộm cây:** Chỉ từ farm trong server này\n` +
-                               `• **Công an:** Chỉ nhận thông báo trộm trong server này\n` +
+                               `• **Trộm cây:** Có thể trộm cả cây chưa thu hoạch (tỉ lệ thất bại cao)\n` +
+                               `• **Cây chưa trưởng thành:** 40% thành công, giá trị 50%\n` +
+                               `• **Cây đã trưởng thành:** 90% thành công, giá trị 80%\n` +
+                               `• **Công an:** Bắt trộm **LIÊN TỤC** không cần nghỉ\n` +
                                `• **Hủy nhà:** Hoàn 50% tiền thuê, mất nghề và tiến trình`, 
                         inline: false 
                     },
@@ -241,6 +245,7 @@ module.exports = {
                         value: `• Nhà cần sửa mỗi 5 ngày hoặc bị thu hồi\n` +
                                `• Mỗi nghề có cooldown và yêu cầu nhà khác nhau\n` +
                                `• Trộm có rủi ro bị công an bắt trong 10 phút\n` +
+                               `• **Công an:** Có thể bắt trộm liên tục, không cần chờ\n` +
                                `• Nghỉ việc nhận 50 Rin trợ cấp\n` +
                                `• **Tất cả hoạt động chỉ trong server hiện tại!**`, 
                         inline: false 
@@ -262,7 +267,7 @@ module.exports = {
                         value: `• \`${prefix}taixiu\` - Mở phiên Tài Xỉu (làm nhà cái)\n` +
                                `• **Cách chơi:** 3 xúc xắc, 11-17 = Tài, 4-10 = Xỉu\n` +
                                `• **Tỷ lệ:** 1:1 (cược 100 thắng 200)\n` +
-                               `• **Tự động:** 60s cược → quay xúc xắc → kết quả\n` +
+                               `• **Cơ chế mới:** Nhà cái bấm nút "🎲 BẮT ĐẦU QUAY" để quay\n` +
                                `• **Đặc biệt:** Cược được cả 2 cửa, xem cầu/phiên đồ\n` +
                                `• **Nút nhanh:** Kết thúc phiên có nút "Bắt đầu phiên mới"`, 
                         inline: false 
@@ -384,8 +389,8 @@ module.exports = {
                     { 
                         name: '🎮 Quy trình chơi', 
                         value: `1. \`${prefix}taixiu\` - Mở phiên (làm nhà cái)\n` +
-                               `2. **60 giây cược:** Bấm nút TÀI/XỈU → nhập số Rin\n` +
-                               `3. **Tự động quay:** Hết thời gian → 3 xúc xắc quay\n` +
+                               `2. **Giai đoạn cược:** Bấm nút TÀI/XỈU → nhập số Rin\n` +
+                               `3. **Nhà cái quyết định:** Bấm "🎲 BẮT ĐẦU QUAY" khi muốn\n` +
                                `4. **Hiển thị từng viên:** Xúc xắc 1 → 2 → 3 → Kết quả\n` +
                                `5. **Tính tiền:** Thắng thua theo kết quả\n` +
                                `6. **Nút nhanh:** "🚀 Bắt đầu phiên mới" để tiếp tục`, 
@@ -463,8 +468,8 @@ module.exports = {
                     { 
                         name: '🏠 Quản lý City', 
                         value: `• \`${prefix}resetcity @user\` - Reset thông tin city\n` +
-                               `• \`${prefix}sethome @user villa\` - Set nhà cho user\n` +
-                               `• \`${prefix}setjob @user mc\` - Set nghề cho user`, 
+                               `• \`${prefix}setjob @user mc\` - Set nghề cho user\n` +
+                               `• **Đã bỏ:** Lệnh sethome để đơn giản hóa`, 
                         inline: false 
                     },
                     { 

@@ -14,14 +14,6 @@ const HOUSE_TYPES = {
         dailyRepair: 0,
         emoji: '🏠'
     },
-    'nhatuong': {
-        name: 'Nhà Thường',
-        price: 2000,
-        description: 'Cân bằng giữa giá và lợi ích',
-        benefits: ['Cho phép mọi nghề (trừ Trộm, Công An)', 'Bonus EXP +10%', 'Sửa chữa 300 Rin/ngày'],
-        dailyRepair: 300,
-        emoji: '🏘️'
-    },
     'nhalau': {
         name: 'Nhà Lầu',
         price: 5000,
@@ -58,7 +50,7 @@ module.exports = {
             const houseInfo = HOUSE_TYPES[houseType];
 
             if (!houseInfo) {
-                return message.reply('❌ Loại nhà không hợp lệ! Sử dụng: `nhatro`, `nhatuong`, `nhalau`, hoặc `bietthu`');
+                return message.reply('❌ Loại nhà không hợp lệ! Sử dụng: `nhatro`, `nhalau`, hoặc `bietthu`');
             }
 
             // Kiểm tra nếu đã có nhà
@@ -133,7 +125,6 @@ module.exports = {
                 houseList +
                 `**💡 Cách sử dụng:**\n` +
                 `• \`,thuenha nhatro\` - Thuê nhà trọ\n` +
-                `• \`,thuenha nhatuong\` - Thuê nhà thường\n` +
                 `• \`,thuenha nhalau\` - Thuê nhà lầu\n` +
                 `• \`,thuenha bietthu\` - Thuê biệt thự\n\n` +
                 `⚠️ **Lưu ý:** Chỉ có thể thuê 1 nhà cùng lúc!`)

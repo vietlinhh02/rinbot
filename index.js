@@ -600,6 +600,15 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
+        // Xử lý interactions cho Nhiệm Vụ
+        if (interaction.customId && interaction.customId.startsWith('mission_')) {
+            const nhiemvuCommand = client.commands.get('nhiemvu');
+            if (nhiemvuCommand && nhiemvuCommand.handleInteraction) {
+                await nhiemvuCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
         // Xử lý interactions cho Farm (muacay)
         if (interaction.customId && (
             interaction.customId.startsWith('plant_tree_')

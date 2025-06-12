@@ -67,13 +67,18 @@ function createBetViews() {
         .setLabel('📊 Xem Phiên Đồ')
         .setStyle(ButtonStyle.Secondary);
 
+    const startButton = new ButtonBuilder()
+        .setCustomId('start_taixiu')
+        .setLabel('🎲 BẮT ĐẦU QUAY')
+        .setStyle(ButtonStyle.Danger);
+
     const cancelButton = new ButtonBuilder()
         .setCustomId('cancel_taixiu')
         .setLabel('❌ Hủy phiên')
         .setStyle(ButtonStyle.Secondary);
 
     const row1 = new ActionRowBuilder().addComponents(taiButton, xiuButton, historyButton);
-    const row2 = new ActionRowBuilder().addComponents(cancelButton);
+    const row2 = new ActionRowBuilder().addComponents(startButton, cancelButton);
 
     return [row1, row2];
 }
@@ -248,7 +253,7 @@ module.exports = {
                 )
                 .setColor(totalPlayers > 0 ? '#00FF00' : '#FFD700')
                 .setThumbnail('https://img.icons8.com/emoji/96/000000/game-die.png')
-                .setFooter({ text: 'Nhà cái bấm "BẮT ĐẦU QUAY" để mở kết quả!' });
+                .setFooter({ text: totalPlayers > 0 ? 'Nhà cái bấm "🎲 BẮT ĐẦU QUAY" để mở kết quả!' : 'Chọn Tài hoặc Xỉu để đặt cược!' });
 
             const views = createBetViews();
 
@@ -509,7 +514,40 @@ module.exports = {
             return;
         }
 
+        if (interaction.customId === 'start_taixiu') {
+            // Chỉ nhà cái mới được bắt đầu quay
+            if (interaction.user.id !== game.host.id) {
+                return interaction.reply({ content: '❌ Chỉ nhà cái mới có thể bắt đầu quay!', flags: 64 });
+            }
 
+            // Kiểm tra phiên đã bắt đầu chưa
+            if (game.started) {
+                return interaction.reply({ content: '❌ Phiên đã bắt đầu rồi!', flags: 64 });
+            }
+
+            // Kiểm tra có người cược không
+            if (game.bets.size === 0) {
+                return interaction.reply({ content: '❌ Phải có ít nhất 1 người cược mới được quay!', flags: 64 });
+            }
+
+            // Đánh dấu phiên đã bắt đầu
+            game.started = true;
+
+            // Trừ tiền người cược
+            for (const [userId, bet] of game.bets) {
+                if (Array.isArray(bet)) {
+                    for (const singleBet of bet) {
+                        await updateUserRin(userId, -singleBet.amount);
+                    }
+                } else {
+                    await updateUserRin(userId, -bet.amount);
+                }
+            }
+
+            // Thực hiện quay xúc xắc
+            await this.executeGame(interaction, game);
+            return;
+        }
 
         if (interaction.customId === 'cancel_taixiu') {
             if (interaction.user.id !== game.host.id && !interaction.member.permissions.has('Administrator')) {

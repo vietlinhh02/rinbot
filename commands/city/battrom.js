@@ -21,7 +21,8 @@ module.exports = {
             const job = JOB_TYPES.congan;
             const lastWork = cityUser.lastWork ? new Date(cityUser.lastWork) : null;
 
-            if (lastWork && (now - lastWork) < job.cooldown) {
+            // Nếu cooldown = 0 thì không cần kiểm tra thời gian
+            if (job.cooldown > 0 && lastWork && (now - lastWork) < job.cooldown) {
                 const timeLeft = job.cooldown - (now - lastWork);
                 const minutesLeft = Math.ceil(timeLeft / (60 * 1000));
                 return message.reply(`⏰ Bạn cần nghỉ thêm **${minutesLeft} phút** nữa mới có thể bắt trộm tiếp!`);
@@ -136,10 +137,13 @@ module.exports = {
             // Phạt trộm (trừ tiền đã trộm + phạt thêm)
             await updateUserRin(thiefUser.id, -(fine + 100));
             
-            // Cập nhật cooldown cho công an
-            await require('../../utils/database').updateCityUser(message.author.id, { 
-                lastWork: new Date() 
-            });
+            // Cập nhật cooldown cho công an (chỉ khi có cooldown)
+            const job = require('../../utils/constants').JOB_TYPES.congan;
+            if (job.cooldown > 0) {
+                await require('../../utils/database').updateCityUser(message.author.id, { 
+                    lastWork: new Date() 
+                });
+            }
 
             // Xóa record trộm cắp
             if (global.theftRecords) {
@@ -187,10 +191,13 @@ module.exports = {
 
     async handleFailedCatch(message, policeUser, thiefUser, correctAnswer) {
         try {
-            // Cập nhật cooldown cho công an
-            await require('../../utils/database').updateCityUser(message.author.id, { 
-                lastWork: new Date() 
-            });
+            // Cập nhật cooldown cho công an (chỉ khi có cooldown)
+            const job = require('../../utils/constants').JOB_TYPES.congan;
+            if (job.cooldown > 0) {
+                await require('../../utils/database').updateCityUser(message.author.id, { 
+                    lastWork: new Date() 
+                });
+            }
 
             const failEmbed = new EmbedBuilder()
                 .setTitle('❌ BẮT TRỘM THẤT BẠI!')
@@ -227,10 +234,13 @@ module.exports = {
 
     async handleTimeout(message, policeUser, thiefUser) {
         try {
-            // Cập nhật cooldown cho công an
-            await require('../../utils/database').updateCityUser(message.author.id, { 
-                lastWork: new Date() 
-            });
+            // Cập nhật cooldown cho công an (chỉ khi có cooldown)
+            const job = require('../../utils/constants').JOB_TYPES.congan;
+            if (job.cooldown > 0) {
+                await require('../../utils/database').updateCityUser(message.author.id, { 
+                    lastWork: new Date() 
+                });
+            }
 
             const timeoutEmbed = new EmbedBuilder()
                 .setTitle('⏰ HẾT THỜI GIAN!')

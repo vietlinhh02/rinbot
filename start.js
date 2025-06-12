@@ -1,16 +1,26 @@
 #!/usr/bin/env node
 
-const DeployManager = require('./deploy-manager.js');
+/**
+ * Rinbot Start Script
+ * Khởi động bot trực tiếp mà không qua Deploy Manager
+ */
 
-console.log('🤖 RinBot Deploy Manager');
-console.log('========================');
-console.log('Tính năng:');
-console.log('• ✅ Tự động khởi động bot');
-console.log('• 🔄 Auto restart khi code thay đổi');
-console.log('• 📤 Thông báo vào Discord');
-console.log('• 🛡️ Graceful shutdown');
-console.log('• 🔧 Crash recovery');
-console.log('========================\n');
+const { spawn } = require('child_process');
 
-// Khởi động Deploy Manager
-new DeployManager(); 
+console.log('🤖 Starting RinBot...');
+
+// Khởi động bot trực tiếp
+const botProcess = spawn('node', ['index.js'], {
+    stdio: 'inherit',
+    env: { ...process.env, FORCE_COLOR: '1' }
+});
+
+botProcess.on('close', (code) => {
+    console.log(`🔴 Bot stopped with code: ${code}`);
+    process.exit(code);
+});
+
+botProcess.on('error', (error) => {
+    console.error('❌ Error starting bot:', error);
+    process.exit(1);
+}); 

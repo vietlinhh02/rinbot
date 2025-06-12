@@ -256,7 +256,7 @@ const JOB_TYPES = {
         workType: "catch_thieves", // Bắt trộm
         catchWindow: 10 * 60 * 1000, // 10 phút để bắt trộm
         puzzleReward: 500, // Thưởng khi giải đúng đố
-        cooldown: 1 * 60 * 60 * 1000 // 1 giờ
+        cooldown: 0 // 0 giây - có thể bắt trộm liên tục
     }
 };
 

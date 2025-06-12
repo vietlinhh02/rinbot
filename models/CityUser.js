@@ -30,7 +30,8 @@ const cityUserSchema = new mongoose.Schema({
             type: Date, // thời gian bắt đầu
             required: false
         }
-    }
+    },
+    completedMissions: { type: Number, default: 0 } // Số nhiệm vụ đã hoàn thành
 }, {
     timestamps: true
 });

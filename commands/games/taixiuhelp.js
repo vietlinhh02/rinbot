@@ -23,8 +23,9 @@ module.exports = {
                     value: `**1.** Nhà cái gõ \`,taixiu\` để mở phiên\n` +
                            `**2.** Người chơi bấm nút **Tài** hoặc **Xỉu**\n` +
                            `**3.** Nhập số Rin muốn cược (hỗ trợ %, all, k, m)\n` +
-                           `**4.** Nhà cái bấm **BẮT ĐẦU QUAY** để mở kết quả\n` +
-                           `**5.** Bot sẽ tự động tính và trả thưởng`,
+                           `**4.** Nhà cái bấm **🎲 BẮT ĐẦU QUAY** để mở kết quả\n` +
+                           `**5.** Bot sẽ tự động tính và trả thưởng\n\n` +
+                           `**✨ Đặc điểm mới:** Nhà cái chủ động quyết định khi nào quay!`,
                     inline: false
                 },
                 {
