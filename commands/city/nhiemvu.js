@@ -59,7 +59,7 @@ module.exports = {
         console.log(`🎯 [NHIEMVU] Show status for user ${message.author.id}`);
         console.log(`🎯 [NHIEMVU] Fresh user data:`, JSON.stringify(freshCityUser.currentMission, null, 2));
 
-        if (freshCityUser.currentMission) {
+        if (freshCityUser.currentMission && freshCityUser.currentMission.type) {
             const mission = MISSIONS[freshCityUser.currentMission.type];
             
             // Kiểm tra mission có tồn tại không
@@ -118,7 +118,7 @@ module.exports = {
                     inline: false
                 }
             )
-            .setColor(freshCityUser.currentMission ? COLORS.warning : COLORS.info)
+            .setColor((freshCityUser.currentMission && freshCityUser.currentMission.type) ? COLORS.warning : COLORS.info)
             .setFooter({ text: 'Làm nhiệm vụ để kiếm Rin!' })
             .setTimestamp();
 
@@ -130,7 +130,7 @@ module.exports = {
         let missionList = '';
         
         Object.entries(MISSIONS).forEach(([type, mission]) => {
-            const available = !cityUser.currentMission ? '✅' : '❌';
+            const available = (!cityUser.currentMission || !cityUser.currentMission.type) ? '✅' : '❌';
             missionList += `${mission.emoji} **${mission.name}** ${available}\n`;
             missionList += `└ ${mission.description}\n`;
             missionList += `└ Thời gian: ${mission.duration} phút\n`;
@@ -157,7 +157,7 @@ module.exports = {
         // Làm mới dữ liệu để kiểm tra trạng thái mới nhất
         const freshCityUser = await getCityUser(message.author.id);
         
-        if (freshCityUser.currentMission) {
+        if (freshCityUser.currentMission && freshCityUser.currentMission.type) {
             const currentMission = MISSIONS[freshCityUser.currentMission.type];
             if (currentMission) {
                 return message.reply(`❌ Bạn đang thực hiện nhiệm vụ **${currentMission.name}**! Hãy hoàn thành hoặc hủy nhiệm vụ hiện tại trước.`);
@@ -165,6 +165,10 @@ module.exports = {
                 // Xóa mission không hợp lệ
                 await updateCityUser(message.author.id, { currentMission: null });
             }
+        } else if (freshCityUser.currentMission) {
+            // Xóa dữ liệu mission không hợp lệ (có currentMission nhưng không có type)
+            console.log(`🎯 [NHIEMVU] Cleaning invalid mission data:`, freshCityUser.currentMission);
+            await updateCityUser(message.author.id, { currentMission: null });
         }
 
         const mission = MISSIONS[missionType.toLowerCase()];
@@ -204,7 +208,11 @@ module.exports = {
         // Làm mới dữ liệu để kiểm tra trạng thái mới nhất
         const freshCityUser = await getCityUser(message.author.id);
         
-        if (!freshCityUser.currentMission) {
+        if (!freshCityUser.currentMission || !freshCityUser.currentMission.type) {
+            // Nếu có dữ liệu không hợp lệ, dọn dẹp
+            if (freshCityUser.currentMission) {
+                await updateCityUser(message.author.id, { currentMission: null });
+            }
             return message.reply('❌ Bạn không có nhiệm vụ nào để hủy!');
         }
 
@@ -240,7 +248,11 @@ module.exports = {
         // Làm mới dữ liệu để kiểm tra trạng thái mới nhất
         const freshCityUser = await getCityUser(message.author.id);
         
-        if (!freshCityUser.currentMission) {
+        if (!freshCityUser.currentMission || !freshCityUser.currentMission.type) {
+            // Nếu có dữ liệu không hợp lệ, dọn dẹp
+            if (freshCityUser.currentMission) {
+                await updateCityUser(message.author.id, { currentMission: null });
+            }
             return message.reply('❌ Bạn không có nhiệm vụ nào để hoàn thành!');
         }
 
@@ -297,7 +309,7 @@ module.exports = {
         console.log(`🎯 [NHIEMVU] Parts: ${parts}, Action: ${action}, UserId: ${userId}`);
 
         if (interaction.user.id !== userId) {
-            return interaction.reply({ content: '❌ Chỉ người nhận nhiệm vụ mới có thể thực hiện!', ephemeral: true });
+            return interaction.reply({ content: '❌ Chỉ người nhận nhiệm vụ mới có thể thực hiện!', flags: 64 });
         }
 
         try {
@@ -310,9 +322,14 @@ module.exports = {
 
                 console.log(`🎯 [NHIEMVU] Confirming mission: ${missionType}`, mission);
 
-                if (cityUser.currentMission) {
+                // Kiểm tra xem user có mission hợp lệ không
+                if (cityUser.currentMission && cityUser.currentMission.type) {
                     console.log(`❌ [NHIEMVU] User already has mission:`, cityUser.currentMission);
-                    return interaction.reply({ content: '❌ Bạn đã có nhiệm vụ rồi!', ephemeral: true });
+                    return interaction.reply({ content: '❌ Bạn đã có nhiệm vụ rồi!', flags: 64 });
+                } else if (cityUser.currentMission) {
+                    // Có mission nhưng không có type - dọn dẹp data
+                    console.log(`🎯 [NHIEMVU] Cleaning invalid mission data before confirm:`, cityUser.currentMission);
+                    await updateCityUser(userId, { currentMission: null });
                 }
 
                 // Nhận nhiệm vụ - sử dụng object thay vì dot notation
@@ -385,7 +402,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Lỗi xử lý interaction nhiệm vụ:', error);
-            await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
+            await interaction.reply({ content: '❌ Có lỗi xảy ra!', flags: 64 });
         }
     },
 
