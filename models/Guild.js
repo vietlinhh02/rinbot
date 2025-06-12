@@ -5,6 +5,16 @@ const guildSchema = new mongoose.Schema({
     prefix: { type: String, default: ',' },
     expertPublicRoom: { type: String, default: null },
     expertCodeFormat: { type: String, default: null },
+    channelSettings: {
+        type: Object,
+        default: {
+            announce: null,    // Channel thông báo
+            log: null,         // Channel log
+            welcome: null,     // Channel chào mừng
+            general: null,     // Channel chat chung
+            game: null         // Channel game
+        }
+    },
     settings: {
         type: Object,
         default: {}

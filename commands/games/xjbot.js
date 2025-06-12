@@ -74,8 +74,12 @@ function checkSpecialHand(cards) {
 
 // Bot AI strategy
 function botShouldDrawCard(cards) {
+    if (!cards || !Array.isArray(cards) || cards.length === 0) {
+        return true; // Bot cần ít nhất 2 lá
+    }
+    
     const points = calculatePoints(cards);
-    const aceCount = cards.filter(card => card.slice(0, -1) === 'A').length;
+    const aceCount = cards.filter(card => card && card.slice(0, -1) === 'A').length;
     
     // Basic bot strategy
     if (points < 12) return true;
@@ -129,7 +133,8 @@ module.exports = {
             status: 'betting', // betting, playing, finished
             timeouts: new Map(), // userId -> timeoutId
             gameTimeout: null,
-            gameMessage: null // Tin nhắn chung cho game
+            gameMessage: null, // Tin nhắn chung cho game
+            gameEnded: false
         });
 
         const embed = new EmbedBuilder()
@@ -252,10 +257,20 @@ module.exports = {
     // HÀM CHÍNH: Cập nhật hiển thị game trong 1 tin nhắn duy nhất
     async updateGameDisplay(channel, channelId) {
         const game = botGames.get(channelId);
+        if (!game || game.gameEnded) return; // Prevent update after game ended
+        
+        // Ensure botCards exists
+        if (!game.botCards) {
+            game.botCards = [];
+        }
+        
+        const hasActivePlayers = Array.from(game.players.values()).some(p => p.status === 'playing');
+        
+        const botPoints = calculatePoints(game.botCards);
+        const botSpecial = checkSpecialHand(game.botCards);
         
         // Tạo display cho tất cả players
         let playersDisplay = '';
-        let hasActivePlayers = false;
         
         for (const [userId, player] of game.players) {
             const points = calculatePoints(player.cards);
@@ -264,7 +279,6 @@ module.exports = {
             let statusIcon = '';
             if (player.status === 'playing') {
                 statusIcon = '🔥';
-                hasActivePlayers = true;
             } else if (player.status === 'stand') {
                 statusIcon = '✋';
             } else if (player.status === 'busted') {
@@ -275,10 +289,6 @@ module.exports = {
             playersDisplay += `   🃏 ${player.cards.join(' ')} *(${points}${special ? ` - ${special}` : ''})*\n\n`;
         }
 
-        // Bot display
-        const botPoints = calculatePoints(game.botCards);
-        const botSpecial = checkSpecialHand(game.botCards);
-        
         const embed = new EmbedBuilder()
             .setTitle('🃏 XÌ DÁCH BOT ĐANG DIỄN RA')
             .setDescription(
@@ -323,7 +333,7 @@ module.exports = {
         }
 
         // Check if game should end
-        if (!hasActivePlayers) {
+        if (!hasActivePlayers && !game.gameEnded) {
             await this.endGame(channel, channelId);
         }
     },
@@ -378,79 +388,122 @@ module.exports = {
     },
 
     async endGame(channel, channelId) {
-        const game = botGames.get(channelId);
-        
-        // Bot play nếu cần
-        while (botShouldDrawCard(game.botCards)) {
-            game.botCards.push(game.deck.pop());
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        try {
+            const game = botGames.get(channelId);
+            if (!game || game.gameEnded) return; // Prevent infinite loop
+            
+            // Mark game as ended to prevent multiple calls
+            game.gameEnded = true;
+            
+            // Ensure botCards exists
+            if (!game.botCards) {
+                game.botCards = [];
+            }
+            
+            // Bot play nếu cần (với safety check để tránh vòng lặp vô hạn)
+            let drawCount = 0;
+            const maxDraws = 10; // Giới hạn số lần rút để tránh vòng lặp vô hạn
+            
+            while (drawCount < maxDraws && botShouldDrawCard(game.botCards) && game.deck && game.deck.length > 0) {
+                game.botCards.push(game.deck.pop());
+                drawCount++;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Show results trước khi cleanup
+            await this.showResults(channel, channelId);
+            
+            // Cleanup
+            if (game.gameTimeout) clearTimeout(game.gameTimeout);
+            for (const timeout of game.timeouts.values()) {
+                clearTimeout(timeout);
+            }
+            
+            botGames.delete(channelId);
+        } catch (error) {
+            console.error('Error in endGame:', error);
+            // Force cleanup even if error
+            try {
+                const game = botGames.get(channelId);
+                if (game) {
+                    if (game.gameTimeout) clearTimeout(game.gameTimeout);
+                    for (const timeout of game.timeouts.values()) {
+                        clearTimeout(timeout);
+                    }
+                    botGames.delete(channelId);
+                }
+            } catch (cleanupError) {
+                console.error('Error in cleanup:', cleanupError);
+            }
         }
-        
-        // Update final display
-        await this.updateGameDisplay(channel, channelId);
-        
-        // Show results
-        await this.showResults(channel, channelId);
-        
-        // Cleanup
-        if (game.gameTimeout) clearTimeout(game.gameTimeout);
-        for (const timeout of game.timeouts.values()) {
-            clearTimeout(timeout);
-        }
-        
-        botGames.delete(channelId);
     },
 
     async showResults(channel, channelId) {
-        const game = botGames.get(channelId);
-        const botPoints = calculatePoints(game.botCards);
-        const botSpecial = checkSpecialHand(game.botCards);
-
-        let resultsText = `🤖 **Bot:** ${game.botCards.join(' ')} *(${botPoints}${botSpecial ? ` - ${botSpecial}` : ''}${botPoints > 21 ? ' - QUẮC' : ''})*\n\n`;
-
-        for (const [userId, player] of game.players) {
-            const points = calculatePoints(player.cards);
-            const special = checkSpecialHand(player.cards);
-            const bet = player.bet;
+        try {
+            const game = botGames.get(channelId);
+            if (!game) return;
             
-            let outcome = '';
-            let reward = 0;
+            // Ensure botCards exists
+            if (!game.botCards) {
+                game.botCards = [];
+            }
+            
+            const botPoints = calculatePoints(game.botCards);
+            const botSpecial = checkSpecialHand(game.botCards);
 
-            // Tính kết quả
-            if (points > 21) {
-                reward = 0;
-                outcome = `💥 QUẮC - Mất ${bet} Rin`;
-            } else if (special === "Xì Dách" && botSpecial !== "Xì Dách") {
-                reward = bet * 3;
-                outcome = `🎉 XÌ DÁCH - Thắng +${bet * 2} Rin`;
-            } else if (special === "Ngũ Linh") {
-                reward = bet * 4;
-                outcome = `✨ NGŨ LINH - Thắng +${bet * 3} Rin`;
-            } else if (botPoints > 21) {
-                reward = bet * 2;
-                outcome = `✅ Bot QUẮC - Thắng +${bet} Rin`;
-            } else if (points > botPoints) {
-                reward = bet * 2;
-                outcome = `🏆 THẮNG - +${bet} Rin`;
-            } else if (points === botPoints) {
-                reward = bet;
-                outcome = `🤝 HÒA - Hoàn ${bet} Rin`;
-            } else {
-                reward = 0;
-                outcome = `❌ THUA - Mất ${bet} Rin`;
+            let resultsText = `🤖 **Bot:** ${game.botCards.join(' ') || 'Không có bài'} *(${botPoints}${botSpecial ? ` - ${botSpecial}` : ''}${botPoints > 21 ? ' - QUẮC' : ''})*\n\n`;
+
+            for (const [userId, player] of game.players) {
+                const points = calculatePoints(player.cards);
+                const special = checkSpecialHand(player.cards);
+                const bet = player.bet;
+                
+                let outcome = '';
+                let reward = 0;
+
+                // Tính kết quả
+                if (points > 21) {
+                    reward = 0;
+                    outcome = `💥 QUẮC - Mất ${bet} Rin`;
+                } else if (special === "Xì Dách" && botSpecial !== "Xì Dách") {
+                    reward = bet * 3;
+                    outcome = `🎉 XÌ DÁCH - Thắng +${bet * 2} Rin`;
+                } else if (special === "Ngũ Linh") {
+                    reward = bet * 4;
+                    outcome = `✨ NGŨ LINH - Thắng +${bet * 3} Rin`;
+                } else if (botPoints > 21) {
+                    reward = bet * 2;
+                    outcome = `✅ Bot QUẮC - Thắng +${bet} Rin`;
+                } else if (points > botPoints) {
+                    reward = bet * 2;
+                    outcome = `🏆 THẮNG - +${bet} Rin`;
+                } else if (points === botPoints) {
+                    reward = bet;
+                    outcome = `🤝 HÒA - Hoàn ${bet} Rin`;
+                } else {
+                    reward = 0;
+                    outcome = `❌ THUA - Mất ${bet} Rin`;
+                }
+
+                await updateUserRin(userId, reward);
+                resultsText += `**${player.user.displayName}:** ${player.cards.join(' ')} *(${points}${special ? ` - ${special}` : ''})*\n${outcome}\n\n`;
             }
 
-            await updateUserRin(userId, reward);
-            resultsText += `**${player.user.displayName}:** ${player.cards.join(' ')} *(${points}${special ? ` - ${special}` : ''})*\n${outcome}\n\n`;
+            const embed = new EmbedBuilder()
+                .setTitle('🏆 KẾT QUẢ XÌ DÁCH BOT')
+                .setDescription(resultsText)
+                .setColor('#FFD700')
+                .setFooter({ text: 'Cảm ơn bạn đã chơi!' });
+
+            await channel.send({ embeds: [embed] });
+        } catch (error) {
+            console.error('Error in showResults:', error);
+            try {
+                await channel.send('❌ Có lỗi xảy ra khi hiển thị kết quả!');
+            } catch (sendError) {
+                console.error('Error sending error message:', sendError);
+            }
         }
-
-        const embed = new EmbedBuilder()
-            .setTitle('🏆 KẾT QUẢ XÌ DÁCH BOT')
-            .setDescription(resultsText)
-            .setColor('#FFD700')
-            .setFooter({ text: 'Cảm ơn bạn đã chơi!' });
-
-        await channel.send({ embeds: [embed] });
     },
 
     // Timeout player (30 giây không hành động)

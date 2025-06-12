@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, ActivityType, Events } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config/config.js');
@@ -6,6 +6,8 @@ const { connectDB, getGuildPrefix, getAllGuildPrefixes } = require('./utils/data
 const cron = require('node-cron');
 const ReminderScheduler = require('./utils/reminderScheduler');
 const marriageTracker = require('./utils/marriageTracker');
+const { handleInteraction } = require('./utils/interactionHandler');
+const ErrorHandler = require('./utils/errorHandler');
 
 // Auto-restart counter
 let restartCount = 0;
@@ -33,6 +35,9 @@ global.typhuRooms = {};
 
 // Khởi tạo ReminderScheduler
 let reminderScheduler;
+
+// Khởi tạo ErrorHandler
+let errorHandler;
 
 // Global error handlers để tránh crash
 process.on('uncaughtException', (error) => {
@@ -121,29 +126,28 @@ const loadCommands = () => {
 };
 
 // Event handler
-client.once('ready', () => {
-    console.log(`🤖 Bot ${client.user.tag} đã sẵn sàng!`);
-    console.log(`📊 Đang phục vụ ${client.guilds.cache.size} servers`);
-    console.log(`🔄 Restart count: ${restartCount}`);
+client.once('ready', async () => {
+    console.log(`Ready! Logged in as ${client.user.tag}`);
     
-    // Reset restart count khi bot start thành công
-    restartCount = 0;
+    // Khởi tạo ErrorHandler sau khi bot ready
+    errorHandler = new ErrorHandler(client);
+    client.errorHandler = errorHandler; // Lưu vào client để truy cập từ commands
+    console.log('✅ ErrorHandler initialized');
     
-    // Thiết lập hoạt động với activity động
+    // Khởi tạo ReminderScheduler
+    reminderScheduler = new ReminderScheduler(client);
+    await reminderScheduler.initialize();
+    console.log('✅ ReminderScheduler initialized');
+
+    // Khởi tạo Marriage Tracker
+    marriageTracker.initialize(client);
+    console.log('✅ Marriage Tracker initialized');
+
+    // Bắt đầu cập nhật bot activity
     updateBotActivity();
+    setInterval(updateBotActivity, 30 * 60 * 1000); // Cập nhật mỗi 30 phút
     
-    // Cập nhật activity mỗi 30 phút để đảm bảo số liệu chính xác
-    setInterval(() => {
-        updateBotActivity();
-    }, 30 * 60 * 1000); // 30 phút
-    
-    // Khởi động Reminder Scheduler
-    try {
-        reminderScheduler = new ReminderScheduler(client);
-        reminderScheduler.start();
-    } catch (error) {
-        console.error('❌ Lỗi khởi động Reminder Scheduler:', error);
-    }
+    console.log('🚀 All systems ready!');
 });
 
 // Error event handlers

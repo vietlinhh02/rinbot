@@ -491,7 +491,18 @@ module.exports = {
                                `⚠️ **Lưu ý:** Chỉ chủ sở hữu bot mới có thể dùng!\n` +
                                `🔧 **Maintenance:** Khi bật, chỉ owner được dùng bot`, 
                         inline: false 
-                    }
+                    },
+                    { name: '🚧 Admin Commands', value: '`setchannel` - Quản lý channel cho bot (Admin)\n' +
+                        '• `setchannel announce #channel` - Set channel thông báo\n' +
+                        '• `setchannel log #channel` - Set channel log hoạt động\n' +
+                        '• `setchannel welcome #channel` - Set channel chào mừng\n' +
+                        '• `setchannel game #channel` - Set channel cho games\n' +
+                        '• `setchannel view` - Xem các channel đã set\n' +
+                        '• `setchannel reset [type]` - Reset channel settings\n' +
+                        '`setrin @user <số>` - Set Rin cho user (Owner only)\n' +
+                        '`addrin @user <số>` - Thêm Rin cho user (Owner only)\n' +
+                        '`maintenance` - Bật/tắt chế độ bảo trì (Owner only)\n' +
+                        '`errortest` - Test hệ thống báo lỗi (Owner only)', inline: false }
                 )
                 .setColor('#FF4444')
                 .setFooter({ text: 'Chỉ dành cho Admin! Lệnh update chỉ dành cho Owner bot.' });
