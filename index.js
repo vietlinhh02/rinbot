@@ -6,7 +6,6 @@ const { connectDB, getGuildPrefix, getAllGuildPrefixes } = require('./utils/data
 const cron = require('node-cron');
 const ReminderScheduler = require('./utils/reminderScheduler');
 const marriageTracker = require('./utils/marriageTracker');
-const { handleInteraction } = require('./utils/interactionHandler');
 const ErrorHandler = require('./utils/errorHandler');
 
 // Auto-restart counter
@@ -136,12 +135,11 @@ client.once('ready', async () => {
     
     // Khởi tạo ReminderScheduler
     reminderScheduler = new ReminderScheduler(client);
-    await reminderScheduler.initialize();
+    reminderScheduler.start();
     console.log('✅ ReminderScheduler initialized');
 
-    // Khởi tạo Marriage Tracker
-    marriageTracker.initialize(client);
-    console.log('✅ Marriage Tracker initialized');
+    // Marriage Tracker không cần khởi tạo - chỉ cần import functions
+    console.log('✅ Marriage Tracker functions loaded');
 
     // Bắt đầu cập nhật bot activity
     updateBotActivity();
