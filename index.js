@@ -270,7 +270,7 @@ client.on('messageCreate', async (message) => {
             const cityUser = await getCityUser(message.author.id);
             
             // Kiểm tra xem user có nghề chat và đang trong ca làm việc không
-            if (cityUser.job && ['nhabao', 'mc'].includes(cityUser.job) && cityUser.workStartTime) {
+            if (cityUser && cityUser.job && ['nhabao', 'mc'].includes(cityUser.job) && cityUser.workStartTime) {
                 const job = JOB_TYPES[cityUser.job];
                 const currentProgress = cityUser.workProgress || 0;
                 

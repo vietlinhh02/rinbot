@@ -115,7 +115,10 @@ module.exports = {
             const userId = parts[3];
             
             if (interaction.user.id !== userId) {
-                return await interaction.reply({ content: '❌ Chỉ người thuê mới có thể thực hiện!', ephemeral: true });
+                if (!interaction.replied && !interaction.deferred) {
+                    return await interaction.reply({ content: '❌ Chỉ người thuê mới có thể thực hiện!', ephemeral: true });
+                }
+                return;
             }
 
             if (result === 'confirm') {
@@ -123,12 +126,18 @@ module.exports = {
                     const cityUser = await getCityUser(userId);
 
                     if (!cityUser.home) {
-                        return await interaction.reply({ content: '❌ Bạn không có nhà để hủy!', ephemeral: true });
+                        if (!interaction.replied && !interaction.deferred) {
+                            return await interaction.reply({ content: '❌ Bạn không có nhà để hủy!', ephemeral: true });
+                        }
+                        return;
                     }
 
                     const houseInfo = HOUSE_TYPES[cityUser.home];
                     if (!houseInfo) {
-                        return await interaction.reply({ content: '❌ Lỗi: Không tìm thấy thông tin nhà!', ephemeral: true });
+                        if (!interaction.replied && !interaction.deferred) {
+                            return await interaction.reply({ content: '❌ Lỗi: Không tìm thấy thông tin nhà!', ephemeral: true });
+                        }
+                        return;
                     }
 
                     const refundAmount = Math.floor(houseInfo.price * 0.5);
@@ -153,10 +162,13 @@ module.exports = {
                         console.log(`🏠 DEBUG: Kết quả update:`, updateResult ? 'thành công' : 'thất bại');
                     } catch (updateError) {
                         console.error(`❌ LỖI UPDATE DATABASE:`, updateError);
-                        return await interaction.reply({ 
-                            content: '❌ Có lỗi xảy ra khi cập nhật database! Vui lòng thử lại sau.', 
-                            ephemeral: true 
-                        });
+                        if (!interaction.replied && !interaction.deferred) {
+                            return await interaction.reply({ 
+                                content: '❌ Có lỗi xảy ra khi cập nhật database! Vui lòng thử lại sau.', 
+                                ephemeral: true 
+                            });
+                        }
+                        return;
                     }
 
                     // Kiểm tra lại để đảm bảo đã xóa thành công
@@ -166,10 +178,13 @@ module.exports = {
                     // Kiểm tra xem update có thành công không
                     if (verifyUser.home !== null || verifyUser.job !== null) {
                         console.error(`❌ LỖI: Update database thất bại! User vẫn có home=${verifyUser.home}, job=${verifyUser.job}`);
-                        return await interaction.reply({ 
-                            content: '❌ Có lỗi xảy ra khi hủy nhà! Vui lòng liên hệ admin để được hỗ trợ.', 
-                            ephemeral: true 
-                        });
+                        if (!interaction.replied && !interaction.deferred) {
+                            return await interaction.reply({ 
+                                content: '❌ Có lỗi xảy ra khi hủy nhà! Vui lòng liên hệ admin để được hỗ trợ.', 
+                                ephemeral: true 
+                            });
+                        }
+                        return;
                     }
 
                     const embed = new EmbedBuilder()
@@ -188,21 +203,15 @@ module.exports = {
                         .setTimestamp();
 
                     // Update message để xóa buttons
-                    try {
-                        if (!interaction.replied && !interaction.deferred) {
-                            await interaction.update({ embeds: [embed], components: [] });
-                        }
-                    } catch (updateError) {
-                        console.error('Lỗi update interaction:', updateError);
-                        // Nếu không update được thì thử reply
-                        if (!interaction.replied && !interaction.deferred) {
-                            await interaction.reply({ embeds: [embed], components: [], ephemeral: true });
-                        }
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.update({ embeds: [embed], components: [] });
                     }
 
                 } catch (error) {
                     console.error('Lỗi xử lý hủy nhà:', error);
-                    await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
+                    }
                 }
 
             } else {
@@ -219,14 +228,8 @@ module.exports = {
             }
         } catch (error) {
             console.error('Lỗi xử lý interaction huynha:', error);
-            try {
-                if (!interaction.replied && !interaction.deferred) {
-                    await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
-                } else if (interaction.deferred) {
-                    await interaction.editReply({ content: '❌ Có lỗi xảy ra!' });
-                }
-            } catch (replyError) {
-                console.error('Lỗi khi reply interaction:', replyError);
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
             }
         }
     }

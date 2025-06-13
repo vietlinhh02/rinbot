@@ -132,6 +132,12 @@ const getCityUser = async (userId) => {
     try {
         let cityUser = await CityUser.findOne({ userId });
         if (!cityUser) {
+            // Kiểm tra xem đã có cityUser với userId này chưa
+            const existingUser = await CityUser.findOne({ userId });
+            if (existingUser) {
+                return existingUser;
+            }
+            // Nếu chưa có thì tạo mới
             cityUser = await CityUser.create({
                 userId,
                 lastRepair: new Date()
