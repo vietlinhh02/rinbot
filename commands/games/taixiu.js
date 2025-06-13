@@ -545,6 +545,7 @@ module.exports = {
             }
 
             // Thực hiện quay xúc xắc
+            await interaction.reply({ content: '🎲 Đang chuẩn bị quay xúc xắc...', ephemeral: true });
             await this.executeGame(interaction, game);
             return;
         }
