@@ -110,9 +110,20 @@ module.exports = {
     // Xử lý button interactions
     async handleInteraction(interaction) {
         try {
-            if (interaction.customId === 'confirm') {
+            if (interaction.customId.startsWith('cancel_house_confirm_')) {
                 // Xử lý xác nhận hủy nhà
-                const cityUser = await getCityUser(interaction.user.id);
+                const userId = interaction.customId.split('_')[3];
+                
+                // Kiểm tra quyền
+                if (interaction.user.id !== userId) {
+                    await interaction.reply({
+                        content: '❌ Chỉ người thuê mới có thể thực hiện!',
+                        ephemeral: true
+                    });
+                    return;
+                }
+
+                const cityUser = await getCityUser(userId);
                 if (!cityUser || !cityUser.home) {
                     await interaction.reply({
                         content: '❌ Bạn chưa có nhà để hủy!',
@@ -121,30 +132,74 @@ module.exports = {
                     return;
                 }
 
+                const houseInfo = HOUSE_TYPES[cityUser.home];
+                const refundAmount = Math.floor(houseInfo.price * 0.5);
+
+                // Hoàn tiền
+                await updateUserRin(userId, refundAmount);
+
                 // Cập nhật thông tin user
-                const updateResult = await updateCityUser(interaction.user.id, {
+                const updateResult = await updateCityUser(userId, {
                     home: null,
-                    job: null
+                    job: null,
+                    workProgress: 0,
+                    lastWork: null,
+                    workStartTime: null,
+                    lastRepair: null,
+                    dailyMoneySteal: 0
                 });
 
                 console.log('🏠 DEBUG: Kết quả update:', updateResult ? 'thành công' : 'thất bại');
 
                 // Verify lại thông tin sau khi update
-                const verifyUser = await getCityUser(interaction.user.id);
+                const verifyUser = await getCityUser(userId);
                 console.log('🏠 DEBUG: Verify user sau khi xóa:', {
                     home: verifyUser?.home,
                     job: verifyUser?.job
                 });
 
+                const embed = new EmbedBuilder()
+                    .setTitle('✅ HỦY THUÊ NHÀ THÀNH CÔNG!')
+                    .setDescription(`**${houseInfo.name}** đã được hủy thành công! 🏠\n\n` +
+                        `**💵 Tiền hoàn lại:** ${refundAmount} Rin\n\n` +
+                        `**📋 Tình trạng hiện tại:**\n` +
+                        `• Nhà: Không có\n` +
+                        `• Nghề: Không có\n\n` +
+                        `**🎯 Bước tiếp theo:**\n` +
+                        `• Dùng \`,thuenha\` để thuê nhà mới\n` +
+                        `• Sau đó dùng \`,dangkynghe\` để chọn nghề`)
+                    .setColor('#00FF00')
+                    .setThumbnail(HOUSE_IMAGES[cityUser.home] || null)
+                    .setFooter({ text: 'Cảm ơn bạn đã sử dụng dịch vụ thuê nhà!' })
+                    .setTimestamp();
+
                 // Cập nhật message với thông báo thành công
                 await interaction.update({
-                    content: '✅ Đã hủy nhà thành công!',
+                    embeds: [embed],
                     components: []
                 });
-            } else if (interaction.customId === 'cancel') {
+
+            } else if (interaction.customId.startsWith('cancel_house_cancel_')) {
+                // Xử lý hủy bỏ thao tác
+                const userId = interaction.customId.split('_')[3];
+                
+                // Kiểm tra quyền
+                if (interaction.user.id !== userId) {
+                    await interaction.reply({
+                        content: '❌ Chỉ người thuê mới có thể thực hiện!',
+                        ephemeral: true
+                    });
+                    return;
+                }
+
+                const embed = new EmbedBuilder()
+                    .setTitle('❌ ĐÃ HỦY THAO TÁC')
+                    .setDescription('Bạn đã quyết định giữ lại nhà hiện tại. Nhà của bạn vẫn an toàn!')
+                    .setColor('#6C757D');
+
                 // Cập nhật message với thông báo hủy
                 await interaction.update({
-                    content: '❌ Đã hủy thao tác!',
+                    embeds: [embed],
                     components: []
                 });
             }
