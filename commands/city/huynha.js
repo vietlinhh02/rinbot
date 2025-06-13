@@ -78,17 +78,21 @@ module.exports = {
             const replyMessage = await message.reply({ embeds: [embed], components: [row] });
 
             // Tạo collector để xử lý button interactions
+            const filter = i => i.user.id === userId && i.customId.startsWith('cancel_house_');
             const collector = replyMessage.createMessageComponentCollector({ 
+                filter,
                 time: 30000, // 30 giây
                 max: 1 // Chỉ xử lý 1 lần
             });
 
             collector.on('collect', async (interaction) => {
+                console.log(`🔧 DEBUG: Received interaction: ${interaction.customId} from user ${interaction.user.id}`);
                 await this.handleInteraction(interaction);
                 collector.stop(); // Dừng collector sau khi xử lý xong
             });
 
-            collector.on('end', async () => {
+            collector.on('end', async (collected) => {
+                console.log(`🔧 DEBUG: Collector ended, collected ${collected.size} interactions`);
                 try {
                     // Disable buttons sau khi hết thời gian hoặc đã xử lý xong
                     const disabledRow = new ActionRowBuilder().addComponents(
@@ -109,13 +113,17 @@ module.exports = {
 
     // Xử lý button interactions
     async handleInteraction(interaction) {
+        console.log(`🔧 DEBUG: handleInteraction called with customId: ${interaction.customId}`);
         try {
             if (interaction.customId.startsWith('cancel_house_confirm_')) {
+                console.log(`🔧 DEBUG: Processing confirm action`);
                 // Xử lý xác nhận hủy nhà
                 const userId = interaction.customId.split('_')[3];
+                console.log(`🔧 DEBUG: Extracted userId: ${userId}, interaction user: ${interaction.user.id}`);
                 
                 // Kiểm tra quyền
                 if (interaction.user.id !== userId) {
+                    console.log(`🔧 DEBUG: Permission denied`);
                     await interaction.reply({
                         content: '❌ Chỉ người thuê mới có thể thực hiện!',
                         ephemeral: true
@@ -124,6 +132,7 @@ module.exports = {
                 }
 
                 const cityUser = await getCityUser(userId);
+                console.log(`🔧 DEBUG: CityUser found:`, cityUser?.home);
                 if (!cityUser || !cityUser.home) {
                     await interaction.reply({
                         content: '❌ Bạn chưa có nhà để hủy!',
@@ -134,6 +143,7 @@ module.exports = {
 
                 const houseInfo = HOUSE_TYPES[cityUser.home];
                 const refundAmount = Math.floor(houseInfo.price * 0.5);
+                console.log(`🔧 DEBUG: Refund amount: ${refundAmount}`);
 
                 // Hoàn tiền
                 await updateUserRin(userId, refundAmount);
@@ -174,12 +184,14 @@ module.exports = {
                     .setTimestamp();
 
                 // Cập nhật message với thông báo thành công
+                console.log(`🔧 DEBUG: Updating interaction with success embed`);
                 await interaction.update({
                     embeds: [embed],
                     components: []
                 });
 
             } else if (interaction.customId.startsWith('cancel_house_cancel_')) {
+                console.log(`🔧 DEBUG: Processing cancel action`);
                 // Xử lý hủy bỏ thao tác
                 const userId = interaction.customId.split('_')[3];
                 
@@ -202,6 +214,8 @@ module.exports = {
                     embeds: [embed],
                     components: []
                 });
+            } else {
+                console.log(`🔧 DEBUG: Unknown customId: ${interaction.customId}`);
             }
         } catch (error) {
             console.error('Lỗi xử lý hủy nhà:', error);
