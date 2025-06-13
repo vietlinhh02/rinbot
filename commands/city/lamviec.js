@@ -1,9 +1,14 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const { getCityUser, updateCityUser, getUserRin, updateUserRin, getUser } = require('../../utils/database');
 const { getFarmUser, updateFarmUser } = require('../../utils/database');
 const { JOB_TYPES, JOB_IMAGES, POLICE_PUZZLES, JOB_NOTIFICATIONS, COLORS, TREE_VALUES } = require('../../utils/constants');
 const Tree = require('../../models/Tree');
 const AntiSpamManager = require('../../utils/antiSpam');
+const config = require('../../config/config');
+const MaintenanceMode = require('../../models/MaintenanceMode');
+
+// Khởi tạo global variables
+if (!global.theftRecords) global.theftRecords = [];
 
 module.exports = {
     name: 'lamviec',
@@ -306,7 +311,6 @@ module.exports = {
             await message.channel.send(stealNotification);
 
             // Tỷ lệ thành công
-            const successRate = 0.7; // 70% thành công
             const isSuccess = Math.random() < successRate;
 
             if (isSuccess) {
@@ -576,18 +580,14 @@ module.exports = {
 
     // Lưu record trộm để công an bắt
     saveTheftRecord(thiefId, victimId, amount, guildId) {
-        // Lưu vào memory hoặc database tạm thời
-        // Sẽ được xóa sau 10 phút
         const record = {
             thiefId,
             victimId,
             amount,
-            guildId, // Thêm guild ID để đảm bảo chỉ hoạt động trong server này
+            guildId,
             timestamp: Date.now()
         };
         
-        // Giả sử có global object để lưu
-        if (!global.theftRecords) global.theftRecords = [];
         global.theftRecords.push(record);
         
         // Tự động xóa sau 10 phút
@@ -598,11 +598,10 @@ module.exports = {
 
     // Xử lý bắt trộm
     async handleCatchThief(message, policeUser, thiefUser) {
-        if (!global.theftRecords) global.theftRecords = [];
-        
         const now = Date.now();
         const recentTheft = global.theftRecords.find(record => 
             record.thiefId === thiefUser.id && 
+            record.guildId === message.guild.id &&
             (now - record.timestamp) <= 10 * 60 * 1000 // 10 phút
         );
 
