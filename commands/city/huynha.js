@@ -75,35 +75,7 @@ module.exports = {
 
             const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
 
-            const replyMessage = await message.reply({ embeds: [embed], components: [row] });
-
-            // Tạo collector để xử lý button interactions
-            const filter = i => i.user.id === userId && i.customId.startsWith('cancel_house_');
-            const collector = replyMessage.createMessageComponentCollector({ 
-                filter,
-                time: 30000, // 30 giây
-                max: 1 // Chỉ xử lý 1 lần
-            });
-
-            collector.on('collect', async (interaction) => {
-                console.log(`🔧 DEBUG: Received interaction: ${interaction.customId} from user ${interaction.user.id}`);
-                await this.handleInteraction(interaction);
-                collector.stop(); // Dừng collector sau khi xử lý xong
-            });
-
-            collector.on('end', async (collected) => {
-                console.log(`🔧 DEBUG: Collector ended, collected ${collected.size} interactions`);
-                try {
-                    // Disable buttons sau khi hết thời gian hoặc đã xử lý xong
-                    const disabledRow = new ActionRowBuilder().addComponents(
-                        confirmButton.setDisabled(true),
-                        cancelButton.setDisabled(true)
-                    );
-                    await replyMessage.edit({ components: [disabledRow] });
-                } catch (error) {
-                    console.error('Lỗi khi disable buttons:', error);
-                }
-            });
+            await message.reply({ embeds: [embed], components: [row] });
 
         } catch (error) {
             console.error('Lỗi huynha:', error);

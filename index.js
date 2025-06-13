@@ -686,6 +686,15 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
+        // Xử lý interactions cho Hủy nhà
+        if (interaction.customId && interaction.customId.startsWith('cancel_house_')) {
+            const huynhaCommand = client.commands.get('huynha');
+            if (huynhaCommand && huynhaCommand.handleInteraction) {
+                await huynhaCommand.handleInteraction(interaction);
+            }
+            return;
+        }
+
         // Xử lý interactions cho Pet system
         if (interaction.customId && (
             interaction.customId.startsWith('breed_') ||
@@ -783,8 +792,8 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
-    } catch (error) {
-        console.error('Lỗi interaction:', error);
+              } catch (error) {
+          console.error('Lỗi interaction:', error);
         // Chỉ reply nếu là lỗi thực sự và interaction chưa được xử lý
         if (!interaction.replied && !interaction.deferred && error.code !== 40060) {
             try {
