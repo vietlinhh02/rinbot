@@ -188,8 +188,16 @@ module.exports = {
                         .setTimestamp();
 
                     // Update message để xóa buttons
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.update({ embeds: [embed], components: [] });
+                    try {
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.update({ embeds: [embed], components: [] });
+                        }
+                    } catch (updateError) {
+                        console.error('Lỗi update interaction:', updateError);
+                        // Nếu không update được thì thử reply
+                        if (!interaction.replied && !interaction.deferred) {
+                            await interaction.reply({ embeds: [embed], components: [], ephemeral: true });
+                        }
                     }
 
                 } catch (error) {

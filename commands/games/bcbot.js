@@ -196,7 +196,14 @@ module.exports = {
 
             const animal = interaction.customId.split('_')[2];
             const modal = new BetModal(animal);
-            await interaction.showModal(modal);
+            try {
+                await interaction.showModal(modal);
+            } catch (error) {
+                console.error('Lỗi show modal:', error);
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({ content: '❌ Có lỗi xảy ra khi mở form cược!', ephemeral: true });
+                }
+            }
             return;
         }
 
