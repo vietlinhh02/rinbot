@@ -79,16 +79,18 @@ module.exports = {
 
             // Tạo collector để xử lý button interactions
             const collector = replyMessage.createMessageComponentCollector({ 
-                time: 30000 // 30 giây
+                time: 30000, // 30 giây
+                max: 1 // Chỉ xử lý 1 lần
             });
 
             collector.on('collect', async (interaction) => {
                 await this.handleInteraction(interaction);
+                collector.stop(); // Dừng collector sau khi xử lý xong
             });
 
             collector.on('end', async () => {
                 try {
-                    // Disable buttons sau khi hết thời gian
+                    // Disable buttons sau khi hết thời gian hoặc đã xử lý xong
                     const disabledRow = new ActionRowBuilder().addComponents(
                         confirmButton.setDisabled(true),
                         cancelButton.setDisabled(true)
@@ -108,128 +110,52 @@ module.exports = {
     // Xử lý button interactions
     async handleInteraction(interaction) {
         try {
-            if (!interaction.customId.startsWith('cancel_house_')) return;
-
-            const parts = interaction.customId.split('_');
-            const result = parts[2]; // confirm hoặc cancel
-            const userId = parts[3];
-            
-            if (interaction.user.id !== userId) {
-                if (!interaction.replied && !interaction.deferred) {
-                    return await interaction.reply({ content: '❌ Chỉ người thuê mới có thể thực hiện!', ephemeral: true });
-                }
-                return;
-            }
-
-            if (result === 'confirm') {
-                try {
-                    const cityUser = await getCityUser(userId);
-
-                    if (!cityUser.home) {
-                        if (!interaction.replied && !interaction.deferred) {
-                            return await interaction.reply({ content: '❌ Bạn không có nhà để hủy!', ephemeral: true });
-                        }
-                        return;
-                    }
-
-                    const houseInfo = HOUSE_TYPES[cityUser.home];
-                    if (!houseInfo) {
-                        if (!interaction.replied && !interaction.deferred) {
-                            return await interaction.reply({ content: '❌ Lỗi: Không tìm thấy thông tin nhà!', ephemeral: true });
-                        }
-                        return;
-                    }
-
-                    const refundAmount = Math.floor(houseInfo.price * 0.5);
-                    const oldHouseThumbnail = HOUSE_IMAGES[cityUser.home] || null;
-
-                    console.log(`🏠 DEBUG: User ${userId} hủy nhà ${cityUser.home}`);
-
-                    // Hoàn tiền và xóa nhà, nghề
-                    try {
-                        await updateUserRin(userId, refundAmount);
-                        
-                        const updateResult = await updateCityUser(userId, {
-                            home: null,
-                            job: null,
-                            workProgress: 0,
-                            lastWork: null,
-                            workStartTime: null,
-                            lastRepair: null,
-                            dailyMoneySteal: 0
-                        });
-
-                        console.log(`🏠 DEBUG: Kết quả update:`, updateResult ? 'thành công' : 'thất bại');
-                    } catch (updateError) {
-                        console.error(`❌ LỖI UPDATE DATABASE:`, updateError);
-                        if (!interaction.replied && !interaction.deferred) {
-                            return await interaction.reply({ 
-                                content: '❌ Có lỗi xảy ra khi cập nhật database! Vui lòng thử lại sau.', 
-                                ephemeral: true 
-                            });
-                        }
-                        return;
-                    }
-
-                    // Kiểm tra lại để đảm bảo đã xóa thành công
-                    const verifyUser = await getCityUser(userId);
-                    console.log(`🏠 DEBUG: Verify user sau khi xóa:`, { home: verifyUser.home, job: verifyUser.job });
-
-                    // Kiểm tra xem update có thành công không
-                    if (verifyUser.home !== null || verifyUser.job !== null) {
-                        console.error(`❌ LỖI: Update database thất bại! User vẫn có home=${verifyUser.home}, job=${verifyUser.job}`);
-                        if (!interaction.replied && !interaction.deferred) {
-                            return await interaction.reply({ 
-                                content: '❌ Có lỗi xảy ra khi hủy nhà! Vui lòng liên hệ admin để được hỗ trợ.', 
-                                ephemeral: true 
-                            });
-                        }
-                        return;
-                    }
-
-                    const embed = new EmbedBuilder()
-                        .setTitle('✅ HỦY THUÊ NHÀ THÀNH CÔNG!')
-                        .setDescription(`**${houseInfo.name}** đã được hủy thành công! 🏠\n\n` +
-                            `**💵 Tiền hoàn lại:** ${refundAmount} Rin\n\n` +
-                            `**📋 Tình trạng hiện tại:**\n` +
-                            `• Nhà: Không có\n` +
-                            `• Nghề: Không có\n\n` +
-                            `**🎯 Bước tiếp theo:**\n` +
-                            `• Dùng \`,thuenha\` để thuê nhà mới\n` +
-                            `• Sau đó dùng \`,dangkynghe\` để chọn nghề`)
-                        .setColor('#00FF00')
-                        .setThumbnail(oldHouseThumbnail)
-                        .setFooter({ text: 'Cảm ơn bạn đã sử dụng dịch vụ thuê nhà!' })
-                        .setTimestamp();
-
-                    // Update message để xóa buttons
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.update({ embeds: [embed], components: [] });
-                    }
-
-                } catch (error) {
-                    console.error('Lỗi xử lý hủy nhà:', error);
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
-                    }
+            if (interaction.customId === 'confirm') {
+                // Xử lý xác nhận hủy nhà
+                const cityUser = await getCityUser(interaction.user.id);
+                if (!cityUser || !cityUser.home) {
+                    await interaction.reply({
+                        content: '❌ Bạn chưa có nhà để hủy!',
+                        ephemeral: true
+                    });
+                    return;
                 }
 
-            } else {
-                // Hủy bỏ hủy nhà
-                const embed = new EmbedBuilder()
-                    .setTitle('❌ ĐÃ HỦY THAO TÁC')
-                    .setDescription('Bạn đã quyết định giữ lại nhà hiện tại. Nhà của bạn vẫn an toàn!')
-                    .setColor('#6C757D');
+                // Cập nhật thông tin user
+                const updateResult = await updateCityUser(interaction.user.id, {
+                    home: null,
+                    job: null
+                });
 
-                // Update message để xóa buttons
-                if (!interaction.replied && !interaction.deferred) {
-                    await interaction.update({ embeds: [embed], components: [] });
-                }
+                console.log('🏠 DEBUG: Kết quả update:', updateResult ? 'thành công' : 'thất bại');
+
+                // Verify lại thông tin sau khi update
+                const verifyUser = await getCityUser(interaction.user.id);
+                console.log('🏠 DEBUG: Verify user sau khi xóa:', {
+                    home: verifyUser?.home,
+                    job: verifyUser?.job
+                });
+
+                // Cập nhật message với thông báo thành công
+                await interaction.update({
+                    content: '✅ Đã hủy nhà thành công!',
+                    components: []
+                });
+            } else if (interaction.customId === 'cancel') {
+                // Cập nhật message với thông báo hủy
+                await interaction.update({
+                    content: '❌ Đã hủy thao tác!',
+                    components: []
+                });
             }
         } catch (error) {
-            console.error('Lỗi xử lý interaction huynha:', error);
+            console.error('Lỗi xử lý hủy nhà:', error);
+            // Nếu interaction chưa được xử lý, gửi thông báo lỗi
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: '❌ Có lỗi xảy ra!', ephemeral: true });
+                await interaction.reply({
+                    content: '❌ Có lỗi xảy ra khi xử lý yêu cầu!',
+                    ephemeral: true
+                });
             }
         }
     }
