@@ -551,29 +551,17 @@ module.exports = {
         }
 
         if (interaction.customId === 'cancel_taixiu') {
+            // Ngăn huỷ khi phiên đã bắt đầu để tránh lỗi hoàn tiền + trả thưởng kép (bị lợi dụng để nhân tiền)
+            if (game.started) {
+                return interaction.reply({ content: '⛔ Phiên đã bắt đầu, không thể hủy nữa!', flags: 64 });
+            }
+
             if (interaction.user.id !== game.host.id && !interaction.member.permissions.has('Administrator')) {
                 return interaction.reply({ content: '⛔ Chỉ nhà cái hoặc admin được hủy!', flags: 64 });
             }
 
-            let cancelMessage = '❌ Phiên Tài Xỉu đã bị hủy!';
-
-            // Chỉ hoàn tiền nếu đã bắt đầu (đã trừ tiền) - Hỗ trợ multi-bet
-            if (game.started) {
-                for (const [userId, bet] of game.bets) {
-                    if (Array.isArray(bet)) {
-                        // Hoàn tiền cho multi-bet
-                        for (const singleBet of bet) {
-                            await updateUserRin(userId, singleBet.amount);
-                        }
-                    } else {
-                        // Hoàn tiền cho single bet
-                        await updateUserRin(userId, bet.amount);
-                    }
-                }
-                cancelMessage = '❌ Phiên Tài Xỉu đã bị hủy! Đã hoàn tiền cho tất cả người chơi.';
-            } else {
-                cancelMessage = '❌ Phiên Tài Xỉu đã bị hủy! (Chưa trừ tiền nên không cần hoàn)';
-            }
+            // Phiên chưa bắt đầu: chỉ cần thông báo, không hoàn tiền vì chưa ai bị trừ
+            const cancelMessage = '❌ Phiên Tài Xỉu đã bị hủy!';
 
             games.delete(channelId);
 

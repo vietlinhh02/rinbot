@@ -132,20 +132,32 @@ const getCityUser = async (userId) => {
     try {
         let cityUser = await CityUser.findOne({ userId });
         if (!cityUser) {
-            // Kiểm tra xem đã có cityUser với userId này chưa
-            const existingUser = await CityUser.findOne({ userId });
-            if (existingUser) {
-                return existingUser;
-            }
-            // Nếu chưa có thì tạo mới
-            cityUser = await CityUser.create({
-                userId,
-                lastRepair: new Date()
-            });
+            // Nếu chưa có thì tạo mới với upsert để tránh duplicate key error
+            cityUser = await CityUser.findOneAndUpdate(
+                { userId },
+                { 
+                    userId,
+                    lastRepair: new Date()
+                },
+                { 
+                    new: true, 
+                    upsert: true,
+                    setDefaultsOnInsert: true
+                }
+            );
         }
         return cityUser;
     } catch (error) {
         console.error('Lỗi getCityUser:', error);
+        // Nếu lỗi duplicate key, thử tìm lại user đã tồn tại
+        if (error.code === 11000) {
+            try {
+                return await CityUser.findOne({ userId });
+            } catch (findError) {
+                console.error('Lỗi tìm lại CityUser:', findError);
+                return null;
+            }
+        }
         return null;
     }
 };

@@ -221,88 +221,111 @@ module.exports = {
 
     // Kiểm tra giveaway hết hạn
     async checkGiveaways(client) {
-        const now = new Date();
-        const expiredGiveaways = await Giveaway.find({
-            endTime: { $lte: now },
-            ended: false
-        });
+        try {
+            // Kiểm tra MongoDB connection trước khi query
+            const mongoose = require('mongoose');
+            if (mongoose.connection.readyState !== 1) {
+                return; // Im lặng bỏ qua nếu MongoDB connection có vấn đề
+            }
 
-        for (const giveaway of expiredGiveaways) {
-            try {
-                const channel = await client.channels.fetch(giveaway.channelId);
-                if (!channel) continue;
+            const now = new Date();
+            const expiredGiveaways = await Giveaway.find({
+                endTime: { $lte: now },
+                ended: false
+            });
 
-                const participants = giveaway.participants || [];
-                
-                if (participants.length === 0) {
-                    const embed = new EmbedBuilder()
-                        .setTitle('🎉 Giveaway kết thúc!')
-                        .setDescription('Không có ai tham gia!')
-                        .setColor('#FF0000');
+            for (const giveaway of expiredGiveaways) {
+                try {
+                    const channel = await client.channels.fetch(giveaway.channelId);
+                    if (!channel) continue;
+
+                    const participants = giveaway.participants || [];
                     
-                    await channel.send({ embeds: [embed] });
-                } else {
-                    // Lọc người tham gia nếu có targetUsers
-                    let eligibleParticipants = participants;
-                    
-                    if (giveaway.targetUsers && giveaway.targetUsers.length > 0) {
-                        // Chỉ những người được chỉ định mới có thể thắng
-                        eligibleParticipants = participants.filter(userId => 
-                            giveaway.targetUsers.includes(userId)
-                        );
+                    if (participants.length === 0) {
+                        const embed = new EmbedBuilder()
+                            .setTitle('🎉 Giveaway kết thúc!')
+                            .setDescription('Không có ai tham gia!')
+                            .setColor('#FF0000');
                         
-                        if (eligibleParticipants.length === 0) {
-                            const embed = new EmbedBuilder()
-                                .setTitle('🎉 Giveaway kết thúc!')
-                                .setDescription(`Không có ai trong danh sách được chỉ định tham gia!\n\n**Người được chỉ định:** ${giveaway.targetUsers.map(id => `<@${id}>`).join(', ')}`)
-                                .setColor('#FF0000');
+                        await channel.send({ embeds: [embed] });
+                    } else {
+                        // Lọc người tham gia nếu có targetUsers
+                        let eligibleParticipants = participants;
+                        
+                        if (giveaway.targetUsers && giveaway.targetUsers.length > 0) {
+                            // Chỉ những người được chỉ định mới có thể thắng
+                            eligibleParticipants = participants.filter(userId => 
+                                giveaway.targetUsers.includes(userId)
+                            );
                             
-                            await channel.send({ embeds: [embed] });
-                            // Đánh dấu đã kết thúc
-                            giveaway.ended = true;
-                            await giveaway.save();
-                            activeGiveaways.delete(giveaway.messageId);
-                            continue;
+                            if (eligibleParticipants.length === 0) {
+                                const embed = new EmbedBuilder()
+                                    .setTitle('🎉 Giveaway kết thúc!')
+                                    .setDescription(`Không có ai trong danh sách được chỉ định tham gia!\n\n**Người được chỉ định:** ${giveaway.targetUsers.map(id => `<@${id}>`).join(', ')}`)
+                                    .setColor('#FF0000');
+                                
+                                await channel.send({ embeds: [embed] });
+                                // Đánh dấu đã kết thúc
+                                giveaway.ended = true;
+                                await giveaway.save();
+                                activeGiveaways.delete(giveaway.messageId);
+                                continue;
+                            }
                         }
+                        
+                        // Random chọn người thắng từ danh sách đủ điều kiện
+                        const winnersCount = Math.min(giveaway.winners, eligibleParticipants.length);
+                        const shuffled = [...eligibleParticipants].sort(() => Math.random() - 0.5);
+                        const winners = shuffled.slice(0, winnersCount);
+                        
+                        const winnersDisplay = winners.map(userId => `<@${userId}>`).join(', ');
+                        
+                        let description = `**Phần thưởng**: ${giveaway.prize}\n` +
+                            `**Người thắng**: ${winnersDisplay}\n` +
+                            `**Tổng người tham gia**: ${participants.length}\n`;
+                        
+                        if (giveaway.targetUsers && giveaway.targetUsers.length > 0) {
+                            description += `**Đủ điều kiện thắng**: ${eligibleParticipants.length}\n`;
+                        }
+                        
+                        description += `\nChúc mừng các bạn!`;
+                        
+                        const embed = new EmbedBuilder()
+                            .setTitle('🎉 GIVEAWAY KẾT THÚC 🎉')
+                            .setDescription(description)
+                            .setColor('#00FF00')
+                            .setFooter({ text: `Hosted bởi ${client.users.cache.get(giveaway.hostId)?.tag || 'Unknown'}` });
+                        
+                        await channel.send({ embeds: [embed] });
                     }
+
+                    // Đánh dấu đã kết thúc
+                    giveaway.ended = true;
+                    await giveaway.save();
                     
-                    // Random chọn người thắng từ danh sách đủ điều kiện
-                    const winnersCount = Math.min(giveaway.winners, eligibleParticipants.length);
-                    const shuffled = [...eligibleParticipants].sort(() => Math.random() - 0.5);
-                    const winners = shuffled.slice(0, winnersCount);
-                    
-                    const winnersDisplay = winners.map(userId => `<@${userId}>`).join(', ');
-                    
-                    let description = `**Phần thưởng**: ${giveaway.prize}\n` +
-                        `**Người thắng**: ${winnersDisplay}\n` +
-                        `**Tổng người tham gia**: ${participants.length}\n`;
-                    
-                    if (giveaway.targetUsers && giveaway.targetUsers.length > 0) {
-                        description += `**Đủ điều kiện thắng**: ${eligibleParticipants.length}\n`;
-                    }
-                    
-                    description += `\nChúc mừng các bạn!`;
-                    
-                    const embed = new EmbedBuilder()
-                        .setTitle('🎉 GIVEAWAY KẾT THÚC 🎉')
-                        .setDescription(description)
-                        .setColor('#00FF00')
-                        .setFooter({ text: `Hosted bởi ${client.users.cache.get(giveaway.hostId)?.tag || 'Unknown'}` });
-                    
-                    await channel.send({ embeds: [embed] });
+                    // Xóa khỏi memory
+                    activeGiveaways.delete(giveaway.messageId);
+
+                } catch (error) {
+                    console.error(`Lỗi xử lý giveaway ${giveaway._id}:`, error);
                 }
-
-                // Đánh dấu đã kết thúc
-                giveaway.ended = true;
-                await giveaway.save();
-                
-                // Xóa khỏi memory
-                activeGiveaways.delete(giveaway.messageId);
-
-            } catch (error) {
-                console.error('Lỗi xử lý giveaway hết hạn:', error);
+            }
+        } catch (error) {
+            // Chỉ log error nếu không phải lỗi MongoDB connection
+            if (!this.isMongoConnectionError(error)) {
+                console.error('Lỗi kiểm tra giveaway:', error);
             }
         }
+    },
+
+    // Helper function để kiểm tra lỗi MongoDB connection
+    isMongoConnectionError(error) {
+        return error.message && (
+            error.message.includes('ReplicaSetNoPrimary') ||
+            error.message.includes('MongoNetworkError') ||
+            error.message.includes('connection failed') ||
+            error.reason?.type === 'ReplicaSetNoPrimary'
+        );
     },
 
     // Load giveaway từ database khi bot khởi động

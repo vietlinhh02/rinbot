@@ -36,6 +36,11 @@ class ReminderScheduler {
     // Kiểm tra và gửi nhắc nhở
     async checkReminders() {
         try {
+            // Kiểm tra MongoDB connection trước khi query
+            if (!this.isMongoConnected()) {
+                return; // Im lặng bỏ qua nếu MongoDB connection có vấn đề
+            }
+
             const now = new Date();
             
             // Tìm các nhắc nhở đã đến hạn (trong vòng 1 phút gần đây để tránh miss)
@@ -56,8 +61,27 @@ class ReminderScheduler {
             }
 
         } catch (error) {
-            console.error('Lỗi kiểm tra reminders:', error);
+            // Chỉ log error nếu không phải lỗi MongoDB connection
+            if (!this.isMongoConnectionError(error)) {
+                console.error('Lỗi kiểm tra reminders:', error);
+            }
         }
+    }
+
+    // Helper function để kiểm tra MongoDB connection
+    isMongoConnected() {
+        const mongoose = require('mongoose');
+        return mongoose.connection.readyState === 1; // 1 = connected
+    }
+
+    // Helper function để kiểm tra lỗi MongoDB connection
+    isMongoConnectionError(error) {
+        return error.message && (
+            error.message.includes('ReplicaSetNoPrimary') ||
+            error.message.includes('MongoNetworkError') ||
+            error.message.includes('connection failed') ||
+            error.reason?.type === 'ReplicaSetNoPrimary'
+        );
     }
 
     // Gửi nhắc nhở cho user
