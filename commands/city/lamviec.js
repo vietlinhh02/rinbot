@@ -141,9 +141,10 @@ module.exports = {
                     `• **Cooldown đặc biệt:** 2 phút/lần trộm\n` +
                     `• **Nguy hiểm:** Có thể bị công an bắt và mất tiền phạt\n` +
                     `• **Thành công:** ~70% cơ hội thành công\n\n` +
-                    `**📋 Cách sử dụng:**\n` +
-                    `• \`,lamviec @user\` - Trộm cây hoặc tiền của user\n` +
-                    `• \`,lamviec list\` - Xem danh sách có thể trộm\n\n` +
+                                    `**📋 Cách sử dụng:**\n` +
+                `• \`,lamviec @user\` - Trộm cây hoặc tiền của user\n` +
+                `• \`,lamviec list\` - Xem danh sách có thể trộm\n` +
+                `• \`,lamviec debug @user\` - Xem chi tiết cây của user\n\n` +
                     `${canWork ? '🎯 **Sẵn sàng để trộm!**' : '⏰ **Đang nghỉ, hãy chờ cooldown!**'}`)
                 .setColor(canWork ? COLORS.warning : COLORS.error)
                 .setThumbnail(JOB_IMAGES.trom)
@@ -157,6 +158,15 @@ module.exports = {
         // Lệnh xem danh sách
         if (args[0].toLowerCase() === 'list') {
             return await this.showStealTargets(message);
+        }
+
+        // Lệnh debug để kiểm tra chi tiết cây của user
+        if (args[0].toLowerCase() === 'debug' && args.length >= 2) {
+            const targetUser = message.mentions.users.first();
+            if (!targetUser) {
+                return message.reply('❌ Hãy tag người bạn muốn debug: `,lamviec debug @user`');
+            }
+            return await this.debugTargetTrees(message, targetUser);
         }
 
         // Trộm của user
@@ -186,10 +196,98 @@ module.exports = {
                 `⚠️ **Nguy cơ:** Có thể bị công an bắt\n` +
                 `📅 **Trộm tiền:** Mỗi nhà chỉ 1 lần/ngày\n` +
                 `🎯 **Trộm cây:** Chưa trưởng thành 40% thành công, đã trưởng thành 90% thành công\n\n` +
-                `*Sử dụng:* \`,lamviec @user\` để trộm`)
+                `*Sử dụng:* \`,lamviec @user\` để trộm\n` +
+                `*Debug:* \`,lamviec debug @user\` để xem chi tiết cây`)
             .setColor(COLORS.info);
 
         return message.reply({ embeds: [embed] });
+    },
+
+    // Debug chi tiết cây của target user
+    async debugTargetTrees(message, targetUser) {
+        try {
+            const targetId = targetUser.id;
+            const now = new Date();
+
+            // Tìm tất cả cây của target trong server này
+            const targetTrees = await Tree.find({ 
+                userId: targetId,
+                guildId: message.guild.id
+            });
+
+            if (targetTrees.length === 0) {
+                return message.reply(`❌ ${targetUser.displayName} không có cây nào trong server này!`);
+            }
+
+            let debugInfo = `**🔍 DEBUG CÂY CỦA ${targetUser.displayName}**\n\n`;
+            debugInfo += `**📊 Tổng quan:**\n`;
+            debugInfo += `• Tổng cây: ${targetTrees.length}\n`;
+            debugInfo += `• Server: ${message.guild.name}\n\n`;
+
+            let stealableCount = 0;
+            let tooYoungCount = 0;
+            let deadCount = 0;
+
+            targetTrees.forEach((tree, index) => {
+                const minutesSincePlant = (now - new Date(tree.plantedAt)) / (1000 * 60);
+                const hoursSincePlant = minutesSincePlant / 60;
+                
+                let status = '';
+                let canSteal = true;
+
+                if (minutesSincePlant < 10) {
+                    status = `❌ Quá non (${Math.floor(minutesSincePlant)} phút)`;
+                    canSteal = false;
+                    tooYoungCount++;
+                } else if (tree.maturedAt) {
+                    const deadMinutes = (now - new Date(tree.maturedAt)) / (1000 * 60);
+                    if (deadMinutes >= 180) {
+                        status = `💀 Đã chết (${Math.floor(deadMinutes)} phút từ lúc trưởng thành)`;
+                        canSteal = false;
+                        deadCount++;
+                    } else {
+                        status = `✅ Có thể trộm (đã trưởng thành ${Math.floor(deadMinutes)} phút)`;
+                        stealableCount++;
+                    }
+                } else {
+                    status = `✅ Có thể trộm (chưa trưởng thành, ${Math.floor(hoursSincePlant)}h${Math.floor(minutesSincePlant % 60)}p)`;
+                    stealableCount++;
+                }
+
+                debugInfo += `**${index + 1}. ${tree.species}:**\n`;
+                debugInfo += `   • Trồng lúc: ${new Date(tree.plantedAt).toLocaleString('vi-VN')}\n`;
+                debugInfo += `   • Tuổi: ${Math.floor(hoursSincePlant)}h${Math.floor(minutesSincePlant % 60)}p\n`;
+                debugInfo += `   • Giai đoạn: ${tree.growthStage}/3\n`;
+                debugInfo += `   • Tưới: ${tree.waterCount}/3 lần\n`;
+                debugInfo += `   • Trạng thái: ${status}\n`;
+                if (tree.maturedAt) {
+                    debugInfo += `   • Trưởng thành lúc: ${new Date(tree.maturedAt).toLocaleString('vi-VN')}\n`;
+                }
+                debugInfo += `\n`;
+            });
+
+            debugInfo += `**📈 Thống kê:**\n`;
+            debugInfo += `• Có thể trộm: ${stealableCount}\n`;
+            debugInfo += `• Quá non (<10p): ${tooYoungCount}\n`;
+            debugInfo += `• Đã chết (>3h): ${deadCount}\n\n`;
+            debugInfo += `**⚠️ Điều kiện trộm cây:**\n`;
+            debugInfo += `• Cây phải được trồng ít nhất 10 phút\n`;
+            debugInfo += `• Cây không được chết (quá 3 tiếng sau trưởng thành)\n`;
+            debugInfo += `• Cây phải trong server này`;
+
+            const embed = new EmbedBuilder()
+                .setTitle('🔍 DEBUG THÔNG TIN CÂY')
+                .setDescription(debugInfo)
+                .setColor(COLORS.info)
+                .setFooter({ text: `Debug bởi ${message.author.displayName}` })
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
+
+        } catch (error) {
+            console.error('Lỗi debug cây:', error);
+            return message.reply('❌ Có lỗi xảy ra khi debug cây!');
+        }
     },
 
     // Thực hiện trộm
@@ -214,22 +312,47 @@ module.exports = {
                 userId: targetId,
                 guildId: message.guild.id // Chỉ tìm cây trong server hiện tại
             });
+            
+            // Chi tiết phân tích từng cây
+            let treeAnalysis = '';
+            let tooYoungTrees = 0;
+            let deadTrees = 0;
+            
             const stealableTrees = targetTrees.filter(tree => {
-                // Có thể trộm tất cả cây (kể cả chưa thu hoạch)
                 const now = new Date();
                 const minutesSincePlant = (now - new Date(tree.plantedAt)) / (1000 * 60);
                 
                 // Chỉ trộm được cây đã trồng ít nhất 10 phút
-                if (minutesSincePlant < 10) return false;
+                if (minutesSincePlant < 10) {
+                    tooYoungTrees++;
+                    return false;
+                }
                 
                 // Nếu cây đã chết thì không trộm được
                 if (tree.maturedAt) {
                     const deadMinutes = (now - new Date(tree.maturedAt)) / (1000 * 60);
-                    if (deadMinutes >= 180) return false; // Cây chết sau 3 tiếng
+                    if (deadMinutes >= 180) { // Cây chết sau 3 tiếng
+                        deadTrees++;
+                        return false;
+                    }
                 }
                 
                 return true;
             });
+
+            // Tạo thông báo chi tiết về cây
+            if (targetTrees.length > 0) {
+                treeAnalysis = `\n\n**🌱 Chi tiết cây của ${targetUser.displayName}:**\n`;
+                treeAnalysis += `• Tổng cây: ${targetTrees.length}\n`;
+                treeAnalysis += `• Cây có thể trộm: ${stealableTrees.length}\n`;
+                if (tooYoungTrees > 0) {
+                    treeAnalysis += `• Cây quá non (dưới 10 phút): ${tooYoungTrees}\n`;
+                }
+                if (deadTrees > 0) {
+                    treeAnalysis += `• Cây đã chết (trưởng thành quá 3h): ${deadTrees}\n`;
+                }
+                treeAnalysis += `\n**⚠️ Lưu ý:** Chỉ trộm được cây đã trồng ít nhất 10 phút và chưa chết!`;
+            }
 
             // Xác định có thể trộm gì
             const canStealTrees = stealableTrees.length > 0; // Trộm cây KHÔNG cần nhà
@@ -237,25 +360,27 @@ module.exports = {
 
             if (!canStealTrees && !canStealHouseMoney) {
                 let reason = '';
-                if (stealableTrees.length === 0) {
+                if (targetTrees.length === 0) {
+                    reason = `${targetUser.displayName} không có cây nào trong server này!`;
+                } else if (stealableTrees.length === 0) {
                     if (!canStealMoney) {
-                        reason = `${targetUser.displayName} không có cây nào để trộm và không trong giờ trộm tiền (19h-21h)!`;
+                        reason = `${targetUser.displayName} không có cây nào có thể trộm và không trong giờ trộm tiền (19h-21h)!`;
                     } else if (!hasHouse) {
-                        reason = `${targetUser.displayName} không có cây nào để trộm và không có nhà để trộm tiền!`;
+                        reason = `${targetUser.displayName} không có cây nào có thể trộm và không có nhà để trộm tiền!`;
                     } else if (hasStealenMoneyToday) {
-                        reason = `${targetUser.displayName} không có cây nào để trộm và bạn đã trộm tiền nhà này hôm nay rồi!`;
+                        reason = `${targetUser.displayName} không có cây nào có thể trộm và bạn đã trộm tiền nhà này hôm nay rồi!`;
                     }
                 } else {
                     // Có cây nhưng không thể trộm tiền vì các lý do khác
                     if (!canStealMoney) {
-                        reason = `${targetUser.displayName} có cây nhưng không trong giờ trộm tiền (19h-21h)!`;
+                        reason = `${targetUser.displayName} có cây có thể trộm nhưng không trong giờ trộm tiền (19h-21h)!`;
                     } else if (!hasHouse) {
-                        reason = `${targetUser.displayName} có cây nhưng không có nhà để trộm tiền!`;
+                        reason = `${targetUser.displayName} có cây có thể trộm nhưng không có nhà để trộm tiền!`;
                     } else if (hasStealenMoneyToday) {
-                        reason = `${targetUser.displayName} có cây nhưng bạn đã trộm tiền nhà này hôm nay rồi!`;
+                        reason = `${targetUser.displayName} có cây có thể trộm nhưng bạn đã trộm tiền nhà này hôm nay rồi!`;
                     }
                 }
-                return message.reply(`❌ ${reason}`);
+                return message.reply(`❌ ${reason}${treeAnalysis}`);
             }
 
             // Quyết định trộm gì (ưu tiên tiền nếu có thể)
